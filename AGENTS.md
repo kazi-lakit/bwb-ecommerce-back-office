@@ -95,3 +95,35 @@ every other sub-field control does. Uploads go in as `accessModifier: "Public"` 
 images need to render on the unauthenticated storefront. The platform enforces no server-side
 size limit or content verification yet (`DATA_GATEWAY_STORAGE_FEATURES_AND_SECURITY.md`
 items A5/A6) — `storage.ts` has a client-side size/type check as a courtesy, not a substitute.
+
+## Feature-flagged Commerce code
+
+`lib/blocks/orders.ts` and `pages/OrdersPage.tsx` are written against the `Order`/`OrderItem`
+schemas drafted in the docs repo's `COMMERCE_SCHEMAS_DRAFT.json`, which isn't imported yet, so
+they sit behind `VITE_COMMERCE_SCHEMAS_LIVE` (off by default — the Orders screen shows a
+"schema isn't live yet" state instead). `lib/blocks/inventory-ops.ts` and
+`lib/blocks/reservation-sweep.ts` sit behind `VITE_INVENTORY_WRITES_LIVE`, because
+`WarehouseInventory` writes are currently denied to everyone including admins until
+`P0_POLICY_FIXES.json` is imported.
+
+Orders deliberately does **not** go through `ResourceListPage`/`createEntityApi`: those read
+their shape from the generated `schema-meta.ts`, which has no `Order` in it and mustn't until
+the schema is actually live. `orders.ts` uses hand-written GraphQL and needs no regeneration.
+
+**A plain `npm run build` doesn't compile the flagged paths** — with the flags off, Rollup
+dead-code-eliminates them. `tsc -b` and `eslint` always cover them; to check they bundle:
+
+```bash
+VITE_COMMERCE_SCHEMAS_LIVE=true VITE_INVENTORY_WRITES_LIVE=true npm run build
+```
+
+The Orders actions that move stock (fulfil consumes reserved inventory, cancel releases it)
+are covered by a simulated-gateway harness, the same pattern as the storefront's:
+
+```bash
+npm run verify:orders
+```
+
+`lib/blocks/inventory-ops.ts` and `lib/blocks/reservation-sweep.ts` are **mirrored
+byte-for-byte** with `ecommerce-consumer` — this workspace has no shared package, the same way
+`collections.ts` and `schema-meta.ts` are duplicated. Change both or neither.

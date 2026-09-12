@@ -11,6 +11,7 @@ import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import WarehouseDetailPage from "@/pages/WarehouseDetailPage";
 import ResourceListPage from "@/pages/ResourceListPage";
+import OrdersPage from "@/pages/OrdersPage";
 
 function Loading() {
   return (
@@ -68,6 +69,10 @@ export default function App() {
           <Route path="/admin" element={<ProtectedLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="warehouse/:warehouseId" element={<WarehouseDetailPage />} />
+            {/* Static segment, so it out-ranks the `:entity` catch-all below. Orders can't go
+                through ResourceListPage — that reads its shape from the generated schema-meta,
+                which has no Order in it until the Commerce schemas are imported. */}
+            <Route path="orders" element={<OrdersPage />} />
             <Route path=":entity" element={<ResourceListPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

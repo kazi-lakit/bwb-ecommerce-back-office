@@ -10,6 +10,7 @@ import {
   Layers,
   LayoutDashboard,
   Package,
+  ShoppingBag,
   Tag,
   Truck,
   Warehouse as WarehouseIcon,
@@ -55,11 +56,24 @@ export interface NavItem {
   icon: ComponentType<LucideProps>;
 }
 
-export const ADMIN_NAV_ITEMS: NavItem[] = ENTITY_ORDER.map((schemaName) => ({
-  schemaName,
-  slug: slugFor(schemaName),
-  label: LABEL_BY_SCHEMA[schemaName] ?? pluralTitle(schemaName),
-  icon: ICON_BY_SCHEMA[schemaName] ?? Package,
-}));
+/**
+ * Orders isn't in ENTITY_ORDER because that comes from the generated `schema-meta.ts`, and the
+ * `Order` schema isn't imported yet (see `lib/blocks/orders.ts`). It's listed by hand so the
+ * screen is reachable now; fold it into the generated list once the schema is live and
+ * `schema-meta.ts` has been regenerated.
+ */
+const COMMERCE_NAV_ITEMS: NavItem[] = [
+  { schemaName: "Order", slug: "orders", label: "Orders", icon: ShoppingBag },
+];
+
+export const ADMIN_NAV_ITEMS: NavItem[] = [
+  ...COMMERCE_NAV_ITEMS,
+  ...ENTITY_ORDER.map((schemaName) => ({
+    schemaName,
+    slug: slugFor(schemaName),
+    label: LABEL_BY_SCHEMA[schemaName] ?? pluralTitle(schemaName),
+    icon: ICON_BY_SCHEMA[schemaName] ?? Package,
+  })),
+];
 
 export const DASHBOARD_NAV_ITEM = { slug: "", label: "Dashboard", icon: LayoutDashboard };
