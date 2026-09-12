@@ -1,7 +1,7 @@
 // AUTO-GENERATED from ECOMMERCE_INVENTORY_SCHEMAS.json — do not hand-edit.
 // Regenerate with scripts/gen-schema-meta.mjs if the source schema file changes.
 
-const PRIMITIVE_FIELD_TYPES = new Set(["String", "Int", "Float", "Boolean", "DateTime"]);
+const PRIMITIVE_FIELD_TYPES = new Set(["String", "Int", "Float", "Boolean", "DateTime", "ID"]);
 
 /**
  * Everything not in this set is a schema-defined composite/object type (Media,

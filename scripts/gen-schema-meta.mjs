@@ -9,6 +9,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = process.argv[2] || resolve(__dirname, "../../bwb-ecommerce-docs/ECOMMERCE_INVENTORY_SCHEMAS.json");
 const OUT = process.argv[3] || resolve(__dirname, "../src/lib/blocks/schema-meta.ts");
 
+// The Data Gateway's own scalar list, verified against
+// blocks-data/server/DataGateway.DomainService/Helpers/GraphQlTypeHelper.cs's IsScalar.
+// Anything else is a composite type declared elsewhere in the same schema export (and
+// collected into COMPLEX_TYPES) — or, if it appears in neither, an invalid field type
+// that the gateway's SchemaImportValidator would reject today. buildSelection() in
+// collections.ts handles that second case defensively rather than emitting `Field { }`.
+const PRIMITIVE_FIELD_TYPES = ["String", "Int", "Float", "Boolean", "DateTime", "ID"];
+
 const SYSTEM_FIELDS = new Set([
   "ItemId",
   "CreatedDate",
@@ -101,6 +109,26 @@ function fieldToTs(f) {
 let ts = "";
 ts += "// AUTO-GENERATED from ECOMMERCE_INVENTORY_SCHEMAS.json — do not hand-edit.\n";
 ts += "// Regenerate with scripts/gen-schema-meta.mjs if the source schema file changes.\n\n";
+
+// The Data Gateway's generated GraphQL treats every schema-defined composite as a real
+// object type, so `collections.ts` has to build a sub-selection for those fields and the
+// resource form UI has to pick a different control for them. That distinction is derived
+// from the same schema export as everything else below, so it belongs in this generated
+// file — it used to be hand-maintained here despite the "do not hand-edit" banner, which
+// meant every regeneration silently deleted it out from under its two importers.
+ts += `const PRIMITIVE_FIELD_TYPES = new Set([${PRIMITIVE_FIELD_TYPES.map(jsStr).join(", ")}]);\n\n`;
+ts += `/**\n`;
+ts += ` * Everything not in this set is a schema-defined composite/object type (Media,\n`;
+ts += ` * Attribute, Pricing, …). On the Data Gateway's generated GraphQL schema those are\n`;
+ts += ` * real object types, not JSON scalars — a query selecting one bare (no \`{ ... }\`\n`;
+ts += ` * sub-selection) fails with "A composite type always needs to specify a selection\n`;
+ts += ` * set." \`src/lib/blocks/collections.ts\` uses this to build that sub-selection from\n`;
+ts += ` * \`COMPLEX_TYPES\`; the resource form UI uses it to decide which fields render as a\n`;
+ts += ` * JSON textarea.\n`;
+ts += ` */\n`;
+ts += `export function isComplexFieldType(type: string): boolean {\n`;
+ts += `  return !PRIMITIVE_FIELD_TYPES.has(type);\n`;
+ts += `}\n\n`;
 ts += `export interface FieldMeta {\n`;
 ts += `  name: string;\n`;
 ts += `  type: string;\n`;

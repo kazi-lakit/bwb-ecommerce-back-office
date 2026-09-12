@@ -40,10 +40,16 @@ const SYSTEM_SCALAR_FIELDS = ["ItemId", "CreatedDate", "LastUpdatedDate", "Creat
 function buildSelection(meta: EntityMeta): string {
   const lines = [...SYSTEM_SCALAR_FIELDS];
   for (const field of meta.fields) {
-    if (isComplexFieldType(field.type)) {
-      const shape = COMPLEX_TYPES[field.type] ?? [];
+    const shape = isComplexFieldType(field.type) ? COMPLEX_TYPES[field.type] : undefined;
+    if (shape?.length) {
       lines.push(`${field.name} { ${shape.map((f) => f.name).join(" ")} }`);
     } else {
+      // Either a scalar, or a "composite" type with no definition in the schema export —
+      // e.g. `WarehouseInventory.Version` is typed `Long`, which isn't in the gateway's
+      // scalar list *and* isn't a declared schema. Emitting `Version { }` for it is a
+      // GraphQL parse error that kills the entire query; selecting it bare is at worst the
+      // same failure the server would raise for a genuinely composite field, and correct
+      // for every scalar the generator doesn't know about.
       lines.push(field.name);
     }
   }
