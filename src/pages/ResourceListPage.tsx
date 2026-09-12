@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import type { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -16,6 +16,7 @@ import {
 import { useHasRole } from "@/lib/blocks/access";
 import { useAuth } from "@/components/providers/auth-provider";
 import { LIFECYCLE_ACTIONS_BY_SCHEMA, ROW_WARNING_BY_SCHEMA } from "@/components/resource/lifecycle-actions";
+import { sweepExpiredReservations } from "@/lib/blocks/reservation-sweep";
 import { slugFor } from "@/components/layout/nav-items";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { assignPlaceholders } from "@/lib/placeholder-images";
@@ -86,6 +87,38 @@ export default function ResourceListPage() {
   const isAdmin = useHasRole("admin");
   const canEdit = !!schemaName && !NO_EDIT_SCHEMAS.has(schemaName) && (!ADMIN_ONLY_EDIT_SCHEMAS.has(schemaName) || isAdmin);
   const canDelete = !!schemaName && !NO_DELETE_SCHEMAS.has(schemaName) && isAdmin;
+
+  // Nothing on this platform expires a reservation on its own — no scheduler, no TTL index
+  // (ECOMMERCE_PLATFORM_ON_BLOCKS.md §6.3). Opening this list is one of the few moments
+  // someone is looking at reservations, so it's where the sweep runs: release the stock held
+  // by anything past its expiry, then refresh so the rows show it. Throttled per session
+  // inside the module, and a failure here is deliberately silent — it's housekeeping, not
+  // something the person came to this page to do.
+  const refetchList = list.refetch;
+  useEffect(() => {
+    if (schemaName !== "InventoryReservation") return;
+    let cancelled = false;
+    void sweepExpiredReservations({
+      actor: user ? { type: "user", id: user.itemId, name: `${user.firstName} ${user.lastName}`.trim() } : undefined,
+    })
+      .then((result) => {
+        if (cancelled || result.expired === 0) return;
+        void refetchList();
+        toast.success(
+          `Released stock from ${result.expired} expired reservation${result.expired === 1 ? "" : "s"}.`
+        );
+        if (result.needsAttention.length > 0) {
+          toast.error(
+            `${result.needsAttention.length} expired reservation(s) could not release their stock — ` +
+              `they show as expired with no released date and need checking.`
+          );
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [schemaName, user, refetchList]);
 
   if (!schemaName || !meta) return <Navigate to="/" replace />;
 
