@@ -20,6 +20,7 @@ import { TabList } from "@/components/ui/tabs";
 import { ResourceTable } from "@/components/resource/resource-table";
 import { ResourceForm } from "@/components/resource/resource-form";
 import { SummaryCard } from "@/components/dashboard/summary-card";
+import { LowStockPanel } from "@/components/dashboard/low-stock-panel";
 import { formatAddress, type Address, type Contact } from "@/components/resource/warehouse-card";
 import { toast } from "@/lib/toast-store";
 import { useHasRole } from "@/lib/blocks/access";
@@ -314,6 +315,11 @@ export default function WarehouseDetailPage() {
         <SummaryCard label="In-progress transfers" icon={Truck} {...transferCount} />
         <SummaryCard label="Open purchase orders" icon={ClipboardList} {...purchaseOrderCount} />
         <SummaryCard label="Inventory movements" icon={Package} {...movementCount} />
+      </div>
+
+      {/* Scoped to this warehouse — the same computation as the dashboard's, filtered. */}
+      <div className="mb-5">
+        <LowStockPanel warehouseId={warehouseId} />
       </div>
 
       <section className="admin-card overflow-hidden">

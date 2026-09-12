@@ -117,12 +117,19 @@ dead-code-eliminates them. `tsc -b` and `eslint` always cover them; to check the
 VITE_COMMERCE_SCHEMAS_LIVE=true VITE_INVENTORY_WRITES_LIVE=true npm run build
 ```
 
-The Orders actions that move stock (fulfil consumes reserved inventory, cancel releases it)
-are covered by a simulated-gateway harness, the same pattern as the storefront's:
+The parts of this app that decide something rather than just render it are covered by a
+harness, the same pattern as the storefront's — the Orders actions that move stock (fulfil
+consumes reserved inventory, cancel releases it) against a simulated gateway, and the
+low-stock classification directly:
 
 ```bash
-npm run verify:orders
+npm run verify
 ```
+
+`lib/blocks/low-stock.ts` answers "which rows need attention" client-side over a bounded page,
+and the panel states its own bound. That isn't only the missing aggregation: the question is
+"is `AvailableToSell` below *this row's own* `ReorderPoint`", a comparison between two fields
+of one document, which a `where` clause can't express at any scale.
 
 `lib/blocks/inventory-ops.ts` and `lib/blocks/reservation-sweep.ts` are **mirrored
 byte-for-byte** with `ecommerce-consumer` — this workspace has no shared package, the same way

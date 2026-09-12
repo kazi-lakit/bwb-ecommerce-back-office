@@ -2,6 +2,7 @@ import { Boxes, Building2, ClipboardList, FolderTree, Package, PackageCheck, Tag
 import { useEntityList } from "@/lib/blocks/hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { SummaryCard } from "@/components/dashboard/summary-card";
+import { LowStockPanel } from "@/components/dashboard/low-stock-panel";
 
 // Real enum values from the schema (see schema-meta.ts) — not guesses. "Pending"/"low
 // stock" aren't literal status strings, so these approximate them as "not yet finished".
@@ -48,9 +49,21 @@ export default function DashboardPage() {
         <SummaryCard label="Open purchase orders" icon={ClipboardList} to="/admin/purchase-order" {...openPurchaseOrders} />
       </div>
 
+      {/*
+        This used to be a note saying low-stock counts couldn't be shown without server-side
+        aggregation. Half right: aggregation is genuinely missing, but the blocker for *this*
+        question is narrower — "available below this row's own reorder point" compares two
+        fields of one document, which no `where` clause can express at any scale. Counting a
+        bounded page client-side answers it, and the panel states its own bound rather than
+        implying it saw everything.
+      */}
+      <div className="mt-6">
+        <LowStockPanel />
+      </div>
+
       <p className="mt-5 flex items-start gap-2 rounded-lg bg-canvas px-4 py-3 text-xs text-muted shadow-[var(--shadow-float)]">
-        <Boxes size={13} /> Available/reserved inventory and low-stock counts need a backend aggregation over
-        WarehouseInventory that isn't exposed yet — not shown here to avoid guessing.
+        <Boxes size={13} /> Totals for available and reserved stock across all warehouses still need a
+        server-side aggregation that isn't exposed yet — not shown here to avoid guessing.
       </p>
     </div>
   );

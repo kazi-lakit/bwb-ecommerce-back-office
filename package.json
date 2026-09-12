@@ -14,7 +14,7 @@
     "set-env": "node set-env.cjs",
     "preview": "vite preview",
     "lint": "eslint .",
-    "verify:orders": "node scripts/verify-orders/run.mjs"
+    "verify": "node scripts/verify/run.mjs"
   },
   "dependencies": {
     "@seliseblocks/client": "^0.1.6",
