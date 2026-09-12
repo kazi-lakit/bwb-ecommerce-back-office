@@ -1,8 +1,9 @@
 /**
  * Verifies the parts of this app that decide something rather than just render it:
  * `src/lib/blocks/orders.ts` (Orders admin actions that move real stock — fulfil consumes
- * reserved inventory, cancel gives it back) against a simulated Data Gateway, and
- * `src/lib/blocks/low-stock.ts` (which inventory rows need attention) directly. Same approach and reasoning as the storefront's `npm run verify`: this app has
+ * reserved inventory, cancel gives it back) against a simulated Data Gateway, `src/lib/blocks/low-stock.ts`
+ * (which inventory rows need attention) and `src/lib/csv.ts` (the CSV codec) and
+ * `src/lib/blocks/bulk.ts` (how a CSV row becomes a mutation payload) directly. Same approach and reasoning as the storefront's `npm run verify`: this app has
  * no test runner, adding one is the repo owner's call, and these actions cannot be exercised
  * against the real gateway because neither the Order schema nor the inventory write policies
  * are live yet.
@@ -41,7 +42,9 @@ const server = await createServer({
 try {
   const orders = await server.ssrLoadModule(resolve(here, "scenarios.ts"));
   const lowStock = await server.ssrLoadModule(resolve(here, "scenarios-low-stock.ts"));
-  const failures = (await orders.run()) + (await lowStock.run());
+  const csv = await server.ssrLoadModule(resolve(here, "scenarios-csv.ts"));
+  const bulk = await server.ssrLoadModule(resolve(here, "scenarios-bulk.ts"));
+  const failures = (await orders.run()) + (await lowStock.run()) + (await csv.run()) + (await bulk.run());
   await server.close();
   process.exit(failures === 0 ? 0 : 1);
 } catch (error) {

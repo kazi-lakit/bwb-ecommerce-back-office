@@ -126,6 +126,20 @@ low-stock classification directly:
 npm run verify
 ```
 
+## Bulk import / export
+
+Every entity list has an Import / export drawer (`components/resource/bulk-panel.tsx`). Export
+honours the list's current filters and writes composite fields as JSON in one cell so they
+survive the round trip; `ItemId` is the first column, which is what makes a re-import an update
+rather than a duplicated catalog.
+
+Two rules worth knowing before changing it: **an empty cell is skipped, never sent as empty**
+(a partly-filled sheet must not wipe fields nobody touched — so clearing a field deliberately
+isn't expressible, which is the right side of that trade), and **rows with problems are
+skipped rather than blocking the file**, with per-line reasons. There's no batch mutation and
+no transaction, so an import applies row by row and failures are reported per line — knowing
+row 34 broke and 1–33 landed is the difference between fixing a cell and re-importing blind.
+
 `lib/blocks/low-stock.ts` answers "which rows need attention" client-side over a bounded page,
 and the panel states its own bound. That isn't only the missing aggregation: the question is
 "is `AvailableToSell` below *this row's own* `ReorderPoint`", a comparison between two fields

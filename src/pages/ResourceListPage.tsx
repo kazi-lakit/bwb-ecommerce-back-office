@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 import type { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ENTITY_ORDER } from "@/lib/blocks/schema-meta";
 import { getEntityMeta, type EntityRecord } from "@/lib/blocks/collections";
@@ -35,6 +35,7 @@ import { ProductTable } from "@/components/resource/product-table";
 import { WarehouseCardGrid } from "@/components/resource/warehouse-card";
 import { ResourceForm } from "@/components/resource/resource-form";
 import { ProductVariantsPanel } from "@/components/resource/product-variants-panel";
+import { BulkPanel } from "@/components/resource/bulk-panel";
 import { toast } from "@/lib/toast-store";
 import { fieldLabel, titleCase } from "@/lib/format";
 
@@ -59,6 +60,7 @@ export default function ResourceListPage() {
   const [editing, setEditing] = useState<EntityRecord | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<EntityRecord | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const meta = useMemo(() => (schemaName ? getEntityMeta(schemaName) : undefined), [schemaName]);
   const searchField = schemaName ? SEARCH_FIELD_BY_SCHEMA[schemaName] : undefined;
@@ -216,6 +218,16 @@ export default function ResourceListPage() {
         breadcrumbs={[{ label: "Dashboard", to: "/admin" }, { label: `${label}s` }]}
         title={`${label}s`}
         description={`Manage ${label.toLowerCase()} records, details, and status.`}
+        actions={
+          // Import writes through the same create/update calls the forms use, so the same
+          // access policies apply — but it's hidden where the UI already hides editing, so
+          // the ledger can't be bulk-written from a screen that refuses single edits.
+          canEdit ? (
+            <Button variant="secondary" onClick={() => setBulkOpen(true)}>
+              <FileSpreadsheet size={15} /> Import / export
+            </Button>
+          ) : undefined
+        }
       />
 
       <section className="admin-card overflow-hidden">
@@ -326,6 +338,16 @@ export default function ResourceListPage() {
               ) : undefined
             }
           />
+        </Drawer>
+      )}
+
+      {bulkOpen && (
+        <Drawer
+          onClose={() => setBulkOpen(false)}
+          title={`Import / export ${label.toLowerCase()}s`}
+          description="Move records in and out as CSV."
+        >
+          <BulkPanel meta={meta} where={where} onDone={() => void refetchList()} />
         </Drawer>
       )}
 
