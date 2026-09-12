@@ -34,6 +34,7 @@ import { ResourceTable } from "@/components/resource/resource-table";
 import { ProductTable } from "@/components/resource/product-table";
 import { WarehouseCardGrid } from "@/components/resource/warehouse-card";
 import { ResourceForm } from "@/components/resource/resource-form";
+import { ProductVariantsPanel } from "@/components/resource/product-variants-panel";
 import { toast } from "@/lib/toast-store";
 import { fieldLabel, titleCase } from "@/lib/format";
 
@@ -308,6 +309,22 @@ export default function ResourceListPage() {
             submitting={mutations.create.isPending || mutations.update.isPending}
             onSubmit={editing ? handleUpdate : handleCreate}
             onCancel={closeModals}
+            extraSections={
+              isProduct ? (
+                <div className="border-t border-hairline pt-6">
+                  {editing ? (
+                    <ProductVariantsPanel productId={(editing.ItemId ?? editing.itemId) as string} />
+                  ) : (
+                    // A variant points at a product by id, and this one doesn't have one yet.
+                    // Said plainly here rather than showing a disabled panel that looks broken.
+                    <p className="text-xs text-muted">
+                      Save this product first, then reopen it to add variants — a variant has to
+                      point at a product that exists.
+                    </p>
+                  )}
+                </div>
+              ) : undefined
+            }
           />
         </Drawer>
       )}
