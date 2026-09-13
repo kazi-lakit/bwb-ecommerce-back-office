@@ -2,11 +2,17 @@ import { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import type { EntityMeta } from "@/lib/blocks/schema-meta";
 import type { EntityListParams } from "@/lib/blocks/collections";
-import { applyRows, exportEntity, parseRows, type ImportOutcome, type RowResult } from "@/lib/blocks/bulk";
-import { downloadCsv, parseCsv } from "@/lib/csv";
+import { applyRows, exportEntity, parseImportFile, type BulkFormat, type ImportOutcome, type RowResult } from "@/lib/blocks/bulk";
+import { downloadFile } from "@/lib/csv";
 import { toast } from "@/lib/toast-store";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+
+/** The file's own extension decides how to read it — `.json` is unambiguous, and anything
+ * else (including a plain `.csv`) is read as CSV, matching what `accept` below offers. */
+function formatFromFilename(name: string): BulkFormat {
+  return name.toLowerCase().endsWith(".json") ? "json" : "csv";
+}
 
 /**
  * Bulk export and import for one entity. Export honours whatever filters the list is showing,
@@ -33,11 +39,11 @@ export function BulkPanel({
   const invalid = preview?.filter((r) => r.errors.length > 0) ?? [];
   const valid = preview?.filter((r) => r.errors.length === 0) ?? [];
 
-  async function handleExport() {
+  async function handleExport(format: BulkFormat) {
     setBusy(true);
     try {
-      const result = await exportEntity(meta, where);
-      downloadCsv(`${meta.schemaName}-${new Date().toISOString().slice(0, 10)}.csv`, result.csv);
+      const result = await exportEntity(meta, where, format);
+      downloadFile(result.filename, result.content, result.mimeType);
       toast.success(
         result.truncated
           ? `Exported the first ${result.rowCount} of ${result.totalCount} — the rest weren't included.`
@@ -53,7 +59,7 @@ export function BulkPanel({
   async function handleFile(file: File) {
     setOutcome(null);
     try {
-      setPreview(parseRows(meta, parseCsv(await file.text())));
+      setPreview(parseImportFile(meta, formatFromFilename(file.name), await file.text()));
     } catch (error) {
       toast.error(`Couldn't read that file: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -82,26 +88,35 @@ export function BulkPanel({
       <section>
         <h3 className="text-sm font-semibold text-ink">Export</h3>
         <p className="mt-1 text-xs text-muted">
-          Everything currently matching your filters, as CSV. Composite fields (pricing, media,
-          addresses) are written as JSON in a single cell so they survive the round trip.
+          Everything currently matching your filters, as CSV or JSON. CSV writes composite fields
+          (pricing, media, addresses) as JSON in a single cell so they survive the round trip;
+          JSON writes them as real nested objects/arrays instead — pick whichever the next step
+          (a spreadsheet, or a script) actually wants.
         </p>
-        <Button className="mt-3" size="sm" variant="secondary" disabled={busy} onClick={() => void handleExport()}>
-          <Download size={14} /> Export {meta.schemaName}
-        </Button>
+        <div className="mt-3 flex gap-2">
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void handleExport("csv")}>
+            <Download size={14} /> Export CSV
+          </Button>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void handleExport("json")}>
+            <Download size={14} /> Export JSON
+          </Button>
+        </div>
       </section>
 
       <section className="border-t border-hairline pt-5">
         <h3 className="text-sm font-semibold text-ink">Import</h3>
         <p className="mt-1 text-xs text-muted">
-          Rows with an <code className="text-ink">ItemId</code> update that record; rows without one create a
-          new record. <strong className="text-ink">Empty cells are left alone, not cleared</strong> — so a
-          partly-filled sheet won't wipe fields you didn't touch.
+          CSV or JSON — same shape a matching export writes; the file's own extension decides
+          which reader is used. Rows with an <code className="text-ink">ItemId</code> update that
+          record; rows without one create a new record.{" "}
+          <strong className="text-ink">Empty (or, in JSON, <code className="text-ink">null</code>) fields are left
+          alone, not cleared</strong> — so a partly-filled file won't wipe fields you didn't touch.
         </p>
 
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.json,text/csv,application/json"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -110,7 +125,7 @@ export function BulkPanel({
           }}
         />
         <Button className="mt-3" size="sm" variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
-          <Upload size={14} /> Choose a CSV
+          <Upload size={14} /> Choose a CSV or JSON file
         </Button>
 
         {preview && (

@@ -1,4 +1,4 @@
-import { csvRowToPayload, exportColumns } from "@/lib/blocks/bulk";
+import { csvRowToPayload, exportColumns, jsonRowToPayload, parseJsonRows } from "@/lib/blocks/bulk";
 import type { EntityMeta } from "@/lib/blocks/schema-meta";
 
 let pass = 0, fail = 0;
@@ -92,6 +92,57 @@ export async function run(): Promise<number> {
 
   console.log("\nB11. strings keep their whitespace");
   check("untrimmed", csvRowToPayload(meta, { Name: " Chair " }, 2).payload.Name === " Chair ");
+
+  console.log("\nB12. JSON rows: real types need no coercion, strings still accepted");
+  const jsonUpdate = jsonRowToPayload(meta, { ItemId: "abc", Name: "Chair", Count: 3, Price: 9.5, Active: true }, 1);
+  check("no errors", jsonUpdate.errors.length === 0, jsonUpdate.errors.join("; "));
+  check("itemId carried", jsonUpdate.itemId === "abc");
+  check("real number kept", jsonUpdate.payload.Count === 3);
+  check("real boolean kept", jsonUpdate.payload.Active === true);
+  const jsonStringNumber = jsonRowToPayload(meta, { Name: "x", Count: "42" }, 1);
+  check("string number still coerced", jsonStringNumber.payload.Count === 42, jsonStringNumber.errors.join("; "));
+
+  console.log("\nB13. JSON rows: null/missing means \"don't touch\", same as an empty CSV cell");
+  const jsonPartial = jsonRowToPayload(meta, { ItemId: "abc", Name: "Chair", Sku: null }, 1);
+  check("null omitted from payload", !("Sku" in jsonPartial.payload), JSON.stringify(jsonPartial.payload));
+  check("no complaint about null", jsonPartial.errors.length === 0, jsonPartial.errors.join("; "));
+
+  console.log("\nB14. JSON rows: composite/array fields are real JSON, not a string to re-parse");
+  const jsonComposite = jsonRowToPayload(meta, { Name: "x", Pricing: { Currency: "USD", RegularPrice: 9 } }, 1);
+  check("object kept as-is", (jsonComposite.payload.Pricing as Record<string, unknown>).RegularPrice === 9);
+  const jsonArr = jsonRowToPayload(meta, { Name: "x", Tagsy: ["a", "b"] }, 1);
+  check("array kept as-is", Array.isArray(jsonArr.payload.Tagsy) && (jsonArr.payload.Tagsy as string[]).length === 2);
+
+  console.log("\nB15. JSON rows: same refusals as CSV for nonsense values");
+  check("bad number refused", jsonRowToPayload(meta, { Name: "x", Price: "cheap" }, 1).errors.some((e) => e.includes("number")));
+  check("bad boolean refused", jsonRowToPayload(meta, { Name: "x", Active: "maybe" }, 1).errors.length === 1);
+  check("bad date refused", jsonRowToPayload(meta, { Name: "x", ReleasedOn: "someday" }, 1).errors.length === 1);
+  check(
+    "unknown column reported",
+    jsonRowToPayload(meta, { Name: "x", Nonsense: 1 }, 1).errors.some((e) => e.includes('unknown column "Nonsense"'))
+  );
+  check("missing Name fails a create", jsonRowToPayload(meta, { Sku: "A" }, 1).errors.some((e) => e.includes("required")));
+
+  console.log("\nB16. a JSON import file is an array, same shape a JSON export writes");
+  const parsed = parseJsonRows(meta, JSON.stringify([{ ItemId: "abc", Name: "Chair" }, { Name: "Table" }]));
+  check("two rows", parsed.length === 2);
+  check("line numbers are 1-based array positions", parsed[0].line === 1 && parsed[1].line === 2);
+  check("first is an update", parsed[0].itemId === "abc");
+  check("second is a create", parsed[1].itemId === undefined);
+  let threw = false;
+  try {
+    parseJsonRows(meta, "not json");
+  } catch {
+    threw = true;
+  }
+  check("malformed JSON throws instead of silently importing nothing", threw);
+  threw = false;
+  try {
+    parseJsonRows(meta, JSON.stringify({ Name: "not an array" }));
+  } catch {
+    threw = true;
+  }
+  check("a JSON object (not array) throws, doesn't guess", threw);
 
   console.log(`\n${pass} passed, ${fail} failed`);
   return fail;

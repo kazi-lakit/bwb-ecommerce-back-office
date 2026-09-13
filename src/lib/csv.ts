@@ -118,9 +118,12 @@ export function parseCsv(text: string): ParsedCsv {
   };
 }
 
-/** Hands the browser a file. Real download, unlike a sandboxed preview — this is the app. */
-export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+/**
+ * Hands the browser a file. Real download, unlike a sandboxed preview — this is the app.
+ * Generic over content/mime type so the same function serves a CSV or a JSON export.
+ */
+export function downloadFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

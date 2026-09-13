@@ -1,6 +1,6 @@
 import { createEntityApi, type EntityListParams } from "./collections";
 import { isComplexFieldType, type EntityMeta } from "./schema-meta";
-import { toCsv, type ParsedCsv } from "@/lib/csv";
+import { toCsv, parseCsv, type ParsedCsv } from "@/lib/csv";
 
 /**
  * Bulk export and import for any entity schema.
@@ -22,17 +22,39 @@ export function exportColumns(meta: EntityMeta): string[] {
   return ["ItemId", ...meta.fields.map((f) => f.name), "CreatedDate", "LastUpdatedDate"];
 }
 
+export type BulkFormat = "csv" | "json";
+
 export interface ExportResult {
-  csv: string;
+  content: string;
+  filename: string;
+  mimeType: string;
   rowCount: number;
   totalCount: number;
   /** True when the collection is larger than the export ceiling. */
   truncated: boolean;
 }
 
+/**
+ * Same rows, shaped as a JSON array instead of CSV text. Unlike a CSV cell, a JSON array/
+ * object field needs no cell-embedded-string workaround — composite and array fields
+ * (Pricing, Media, Tags, …) come out as real nested JSON, not a JSON string inside a string.
+ * Every row gets exactly `columns`, in that order, with a missing value written as `null`
+ * rather than omitted — so a hand-edited re-import sees every field explicitly and an
+ * accidentally-deleted key isn't silently indistinguishable from "was never set".
+ */
+function toJson(rows: Record<string, unknown>[], columns: string[]): string {
+  const picked = rows.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const column of columns) out[column] = row[column] ?? null;
+    return out;
+  });
+  return JSON.stringify(picked, null, 2);
+}
+
 export async function exportEntity(
   meta: EntityMeta,
-  where: EntityListParams["where"]
+  where: EntityListParams["where"],
+  format: BulkFormat = "csv"
 ): Promise<ExportResult> {
   const api = createEntityApi(meta.schemaName);
   const rows: Record<string, unknown>[] = [];
@@ -45,8 +67,12 @@ export async function exportEntity(
     if (page.items.length === 0 || rows.length >= page.totalCount) break;
   }
 
+  const columns = exportColumns(meta);
+  const datestamp = new Date().toISOString().slice(0, 10);
   return {
-    csv: toCsv(rows, exportColumns(meta)),
+    content: format === "json" ? toJson(rows, columns) : toCsv(rows, columns),
+    filename: `${meta.schemaName}-${datestamp}.${format}`,
+    mimeType: format === "json" ? "application/json;charset=utf-8;" : "text/csv;charset=utf-8;",
     rowCount: rows.length,
     totalCount,
     truncated: totalCount > rows.length,
@@ -140,6 +166,116 @@ export function csvRowToPayload(meta: EntityMeta, row: Record<string, string>, l
 
 export function parseRows(meta: EntityMeta, parsed: ParsedCsv): RowResult[] {
   return parsed.rows.map((row, i) => csvRowToPayload(meta, row, i + 2));
+}
+
+/**
+ * The JSON counterpart to `coerce` above. A JSON export already carries real types — a
+ * number is a JSON number, a composite/array field is real JSON, not a string to re-parse —
+ * so this mostly validates rather than converts. It still accepts the string forms `coerce`
+ * does (a hand-edited `"42"` for an Int, `"true"` for a Boolean, …), since a JSON file is just
+ * as editable by hand as a CSV one and shouldn't be stricter about it.
+ */
+function coerceJson(
+  value: unknown,
+  field: { name: string; type: string; isArray: boolean }
+): { value?: unknown; error?: string } {
+  if (field.isArray || isComplexFieldType(field.type)) {
+    // Already real JSON (an array or an object) — nothing to parse, unlike a CSV cell.
+    return { value };
+  }
+
+  switch (field.type) {
+    case "Int":
+    case "Float": {
+      const n = typeof value === "number" ? value : Number(value);
+      if (!Number.isFinite(n)) return { error: `${field.name}: ${JSON.stringify(value)} isn't a number` };
+      if (field.type === "Int" && !Number.isInteger(n)) return { error: `${field.name}: ${JSON.stringify(value)} isn't a whole number` };
+      return { value: n };
+    }
+    case "Boolean": {
+      if (typeof value === "boolean") return { value };
+      const lower = String(value).trim().toLowerCase();
+      if (["true", "yes", "1"].includes(lower)) return { value: true };
+      if (["false", "no", "0"].includes(lower)) return { value: false };
+      return { error: `${field.name}: ${JSON.stringify(value)} isn't true/false` };
+    }
+    case "DateTime": {
+      const text = String(value);
+      if (Number.isNaN(Date.parse(text))) return { error: `${field.name}: ${JSON.stringify(value)} isn't a date` };
+      return { value: new Date(text).toISOString() };
+    }
+    default:
+      // Same "don't quietly rewrite what's there" rule as the CSV path: a real JSON string
+      // is kept exactly as written; anything else for a String field is called out rather
+      // than silently stringified, since that usually means the wrong column.
+      if (typeof value === "string") return { value };
+      return { error: `${field.name}: expected a string, got ${JSON.stringify(value)}` };
+  }
+}
+
+/**
+ * The JSON counterpart to `csvRowToPayload` — same rules (empty/missing means "don't touch
+ * this field", unknown columns are reported not dropped, required fields only matter on
+ * create), just reading a plain object instead of a CSV row of strings. `null` is treated
+ * the same as an omitted key: a hand-edited re-import of an exported row (which writes
+ * `null` for anything unset, see `toJson`) must not turn that into "clear this field".
+ */
+export function jsonRowToPayload(meta: EntityMeta, row: Record<string, unknown>, line: number): RowResult {
+  const payload: Record<string, unknown> = {};
+  const errors: string[] = [];
+  const known = new Set(meta.fields.map((f) => f.name));
+
+  for (const [column, raw] of Object.entries(row)) {
+    if (SYSTEM_COLUMNS.includes(column)) continue;
+    if (!known.has(column)) {
+      errors.push(`unknown column "${column}"`);
+      continue;
+    }
+    if (raw === null || raw === undefined || raw === "") continue;
+    const field = meta.fields.find((f) => f.name === column)!;
+    const { value, error } = coerceJson(raw, field);
+    if (error) errors.push(error);
+    else payload[column] = value;
+  }
+
+  for (const field of meta.fields) {
+    if (field.required && payload[field.name] === undefined && !row.ItemId) {
+      errors.push(`${field.name} is required`);
+    }
+  }
+
+  const itemId = typeof row.ItemId === "string" && row.ItemId ? row.ItemId : undefined;
+  return { line, itemId, payload, errors };
+}
+
+/**
+ * Parses a JSON import file — an array of row objects, the same shape `exportEntity`
+ * writes (see `toJson`). `line` numbers the array position (1-based); there's no header row
+ * to offset by the way a spreadsheet's line 1 is its header.
+ */
+export function parseJsonRows(meta: EntityMeta, text: string): RowResult[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!Array.isArray(data)) {
+    throw new Error("Expected a JSON array of records, the same shape a JSON export writes.");
+  }
+
+  return data.map((row, i) => {
+    const line = i + 1;
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      return { line, payload: {}, errors: [`entry ${line} isn't an object`] };
+    }
+    return jsonRowToPayload(meta, row as Record<string, unknown>, line);
+  });
+}
+
+/** One entry point for the panel — reads a CSV or JSON import file by the format the user picked. */
+export function parseImportFile(meta: EntityMeta, format: BulkFormat, text: string): RowResult[] {
+  return format === "json" ? parseJsonRows(meta, text) : parseRows(meta, parseCsv(text));
 }
 
 export interface ImportOutcome {
