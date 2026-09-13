@@ -1,0 +1,21 @@
+{
+  "schemaName": "Attribute",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Code",
+      "type": "String",
+      "description": "Stable machine-readable attribute code."
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Display name."
+    },
+    {
+      "name": "Value",
+      "type": "String",
+      "description": "Attribute value."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schemaName": "Actor",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Type",
+      "type": "String",
+      "description": "Actor type: user, system, or integration."
+    },
+    {
+      "name": "Id",
+      "type": "String",
+      "description": "Actor identifier."
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Actor display name."
+    }
+  ]
+}

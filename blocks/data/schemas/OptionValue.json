@@ -1,0 +1,21 @@
+{
+  "schemaName": "OptionValue",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Code",
+      "type": "String",
+      "description": "Option code."
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Option display name."
+    },
+    {
+      "name": "Value",
+      "type": "String",
+      "description": "Selected value."
+    }
+  ]
+}

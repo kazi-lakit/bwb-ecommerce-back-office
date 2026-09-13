@@ -1,0 +1,49 @@
+{
+  "schemaName": "StockTransfer",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "TransferNumber",
+      "type": "String",
+      "description": "Organization-unique transfer number.",
+      "isUniqueData": true
+    },
+    {
+      "name": "SourceWarehouseId",
+      "type": "String",
+      "description": "Origin warehouse."
+    },
+    {
+      "name": "DestinationWarehouseId",
+      "type": "String",
+      "description": "Destination warehouse."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "draft, approved, in_transit, partially_received, received, or cancelled."
+    },
+    {
+      "name": "Items",
+      "type": "TransferItem",
+      "isArray": true,
+      "description": "Transferred inventory lines."
+    },
+    {
+      "name": "ExpectedArrivalDate",
+      "type": "DateTime",
+      "description": "Expected arrival timestamp."
+    },
+    {
+      "name": "ApprovedBy",
+      "type": "String",
+      "description": "Approver user identifier."
+    },
+    {
+      "name": "ApprovedDate",
+      "type": "DateTime",
+      "description": "Approval timestamp."
+    }
+  ],
+  "collectionName": "blx_StockTransfers"
+}

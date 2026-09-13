@@ -1,0 +1,38 @@
+{
+  "schemaName": "Brand",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Brand display name."
+    },
+    {
+      "name": "Slug",
+      "type": "String",
+      "description": "URL-safe unique brand slug.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Description",
+      "type": "String",
+      "description": "Brand description."
+    },
+    {
+      "name": "LogoUrl",
+      "type": "String",
+      "description": "Brand logo URL."
+    },
+    {
+      "name": "WebsiteUrl",
+      "type": "String",
+      "description": "Official brand website."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Lifecycle status: active, inactive, or archived."
+    }
+  ],
+  "collectionName": "blx_Brands"
+}

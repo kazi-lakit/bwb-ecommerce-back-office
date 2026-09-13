@@ -1,0 +1,31 @@
+{
+  "schemaName": "ReservationItem",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "WarehouseId",
+      "type": "String",
+      "description": "Warehouse reserving the stock."
+    },
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Parent product identifier."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Reserved variant identifier."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "SKU snapshot."
+    },
+    {
+      "name": "Quantity",
+      "type": "Float",
+      "description": "Reserved quantity."
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schemaName": "OrderItem",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Product this line refers to."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Sellable variant this line refers to."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "SKU snapshot at order placement time."
+    },
+    {
+      "name": "NameSnapshot",
+      "type": "String",
+      "description": "Product/variant display name snapshot at order placement time."
+    },
+    {
+      "name": "UnitPrice",
+      "type": "Float",
+      "description": "Price snapshot at order placement time. Never recompute from the live catalog after the fact."
+    },
+    {
+      "name": "Quantity",
+      "type": "Float",
+      "description": "Quantity ordered."
+    },
+    {
+      "name": "TaxAmount",
+      "type": "Float",
+      "description": "Tax amount snapshot for this line."
+    },
+    {
+      "name": "DiscountAmount",
+      "type": "Float",
+      "description": "Discount amount snapshot for this line."
+    },
+    {
+      "name": "LineTotal",
+      "type": "Float",
+      "description": "UnitPrice * Quantity, plus TaxAmount, minus DiscountAmount \u2014 the actual charged amount for this line."
+    }
+  ]
+}

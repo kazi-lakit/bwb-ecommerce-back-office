@@ -1,0 +1,36 @@
+{
+  "schemaName": "Address",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Line1",
+      "type": "String",
+      "description": "Primary street address."
+    },
+    {
+      "name": "Line2",
+      "type": "String",
+      "description": "Additional address information."
+    },
+    {
+      "name": "City",
+      "type": "String",
+      "description": "City or locality."
+    },
+    {
+      "name": "State",
+      "type": "String",
+      "description": "State, province, or region."
+    },
+    {
+      "name": "PostalCode",
+      "type": "String",
+      "description": "Postal or ZIP code."
+    },
+    {
+      "name": "CountryCode",
+      "type": "String",
+      "description": "ISO 3166-1 alpha-2 country code."
+    }
+  ]
+}

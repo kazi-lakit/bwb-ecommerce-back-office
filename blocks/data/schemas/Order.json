@@ -1,0 +1,110 @@
+{
+  "schemaName": "Order",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "OrderNumber",
+      "type": "String",
+      "description": "Human-facing order number, generated at placement.",
+      "isUniqueData": true
+    },
+    {
+      "name": "CustomerId",
+      "type": "String",
+      "description": "IAM UserId of the ordering customer. Set from the authenticated caller on create, never from client input."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Draft, PendingPayment, Confirmed, Cancelled, or Completed."
+    },
+    {
+      "name": "PaymentStatus",
+      "type": "String",
+      "description": "Pending, Authorized, Paid, PartiallyRefunded, Refunded, or Failed."
+    },
+    {
+      "name": "FulfillmentStatus",
+      "type": "String",
+      "description": "Unallocated, Allocated, Picking, Packed, PartiallyShipped, Shipped, or Delivered."
+    },
+    {
+      "name": "Items",
+      "type": "OrderItem",
+      "isArray": true,
+      "description": "Line items at the time of placement, with price/tax/discount snapshots \u2014 never re-derive these from the live catalog."
+    },
+    {
+      "name": "ShippingAddress",
+      "type": "Address",
+      "description": "Snapshot of the shipping address at order placement time."
+    },
+    {
+      "name": "BillingAddress",
+      "type": "Address",
+      "description": "Snapshot of the billing address at order placement time."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO currency code for all monetary fields on this order."
+    },
+    {
+      "name": "SubTotal",
+      "type": "Float",
+      "description": "Sum of line totals before tax/shipping/discount."
+    },
+    {
+      "name": "TaxTotal",
+      "type": "Float",
+      "description": "Total tax across all lines."
+    },
+    {
+      "name": "DiscountTotal",
+      "type": "Float",
+      "description": "Total discount across all lines and order-level promotions."
+    },
+    {
+      "name": "ShippingTotal",
+      "type": "Float",
+      "description": "Shipping charge for this order."
+    },
+    {
+      "name": "GrandTotal",
+      "type": "Float",
+      "description": "The actual amount charged: SubTotal + TaxTotal + ShippingTotal - DiscountTotal."
+    },
+    {
+      "name": "CouponCode",
+      "type": "String",
+      "description": "Coupon code applied at checkout, if any."
+    },
+    {
+      "name": "IdempotencyKey",
+      "type": "String",
+      "description": "Client-generated key reused on every retry of the same checkout attempt. IsUniqueData alone is a check-then-act query, not a real constraint \u2014 a genuine MongoDB unique index must also be created on this field before this is trustworthy for production checkout (see DATA_GATEWAY_STORAGE_FEATURES_AND_SECURITY.md item B2).",
+      "isUniqueData": true
+    },
+    {
+      "name": "SalesChannelType",
+      "type": "String",
+      "description": "Ecommerce, POS, MobileApp, Marketplace, or Wholesale."
+    },
+    {
+      "name": "PlacedDate",
+      "type": "DateTime",
+      "description": "When the order was placed."
+    },
+    {
+      "name": "ConfirmedDate",
+      "type": "DateTime",
+      "description": "When payment/confirmation completed."
+    },
+    {
+      "name": "CancelledDate",
+      "type": "DateTime",
+      "description": "When the order was cancelled, if applicable."
+    }
+  ],
+  "collectionName": "blx_Orders"
+}

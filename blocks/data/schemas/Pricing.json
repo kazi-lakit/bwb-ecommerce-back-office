@@ -1,0 +1,26 @@
+{
+  "schemaName": "Pricing",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO 4217 currency code."
+    },
+    {
+      "name": "RegularPrice",
+      "type": "Float",
+      "description": "Standard selling price."
+    },
+    {
+      "name": "SalePrice",
+      "type": "Float",
+      "description": "Optional discounted selling price."
+    },
+    {
+      "name": "CostPrice",
+      "type": "Float",
+      "description": "Internal acquisition or production cost."
+    }
+  ]
+}

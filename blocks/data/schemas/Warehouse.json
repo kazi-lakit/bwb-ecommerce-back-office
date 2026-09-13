@@ -1,0 +1,58 @@
+{
+  "schemaName": "Warehouse",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "Code",
+      "type": "String",
+      "description": "Organization-unique warehouse code.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Warehouse display name."
+    },
+    {
+      "name": "Type",
+      "type": "String",
+      "description": "warehouse, store, fulfillment_center, or virtual."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Lifecycle status."
+    },
+    {
+      "name": "Address",
+      "type": "Address",
+      "description": "Warehouse address."
+    },
+    {
+      "name": "Contact",
+      "type": "Contact",
+      "description": "Warehouse contact."
+    },
+    {
+      "name": "AllowPickup",
+      "type": "Boolean",
+      "description": "Whether customer pickup is allowed."
+    },
+    {
+      "name": "AllowShipping",
+      "type": "Boolean",
+      "description": "Whether outbound shipping is allowed."
+    },
+    {
+      "name": "FulfillmentPriority",
+      "type": "Int",
+      "description": "Lower values are selected first."
+    },
+    {
+      "name": "Timezone",
+      "type": "String",
+      "description": "IANA timezone identifier."
+    }
+  ],
+  "collectionName": "blx_Warehouses"
+}

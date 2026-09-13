@@ -1,0 +1,31 @@
+{
+  "schemaName": "InventoryQuantity",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "OnHand",
+      "type": "Float",
+      "description": "Physical quantity currently present."
+    },
+    {
+      "name": "Reserved",
+      "type": "Float",
+      "description": "Quantity reserved for open carts or orders."
+    },
+    {
+      "name": "Damaged",
+      "type": "Float",
+      "description": "Quantity unavailable because it is damaged."
+    },
+    {
+      "name": "QualityHold",
+      "type": "Float",
+      "description": "Quantity unavailable pending inspection."
+    },
+    {
+      "name": "Incoming",
+      "type": "Float",
+      "description": "Confirmed quantity expected from purchase orders or transfers."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schemaName": "InventoryBalance",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "OnHand",
+      "type": "Float",
+      "description": "On-hand balance after the movement."
+    },
+    {
+      "name": "Reserved",
+      "type": "Float",
+      "description": "Reserved balance after the movement."
+    },
+    {
+      "name": "AvailableToSell",
+      "type": "Float",
+      "description": "Sellable balance after the movement."
+    }
+  ]
+}

@@ -1,0 +1,354 @@
+{
+  "policies": [
+    {
+      "schemaName": "CommerceCustomer",
+      "policyName": "customer can read own profile",
+      "policyDescription": "A signed-in customer may read their own commerce profile.",
+      "policyType": 0,
+      "operation": 0,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 1,
+            "leftOperand": "UserId",
+            "operator": 0,
+            "rightSource": 0,
+            "rightOperand": "UserId",
+            "staticValue": null,
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "CommerceCustomer",
+      "policyName": "staff can read all customers",
+      "policyDescription": "Placeholder: scope to Order manager / Customer-support roles once those exist (Phase 0 role model). Currently admin-only.",
+      "policyType": 0,
+      "operation": 0,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "CommerceCustomer",
+      "policyName": "customer can edit own profile",
+      "policyDescription": "A signed-in customer may edit their own commerce profile.",
+      "policyType": 0,
+      "operation": 2,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 1,
+            "leftOperand": "UserId",
+            "operator": 0,
+            "rightSource": 0,
+            "rightOperand": "UserId",
+            "staticValue": null,
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "CommerceCustomer",
+      "policyName": "only admin can delete data",
+      "policyDescription": "Only administrators may permanently delete records.",
+      "policyType": 0,
+      "operation": 3,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Cart",
+      "policyName": "customer can read own cart",
+      "policyDescription": "A signed-in customer may read only their own cart.",
+      "policyType": 0,
+      "operation": 0,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 1,
+            "leftOperand": "CustomerId",
+            "operator": 0,
+            "rightSource": 0,
+            "rightOperand": "UserId",
+            "staticValue": null,
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Cart",
+      "policyName": "customer can edit own cart",
+      "policyDescription": "A signed-in customer may edit only their own cart.",
+      "policyType": 0,
+      "operation": 2,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 1,
+            "leftOperand": "CustomerId",
+            "operator": 0,
+            "rightSource": 0,
+            "rightOperand": "UserId",
+            "staticValue": null,
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Cart",
+      "policyName": "customer can delete own cart",
+      "policyDescription": "A signed-in customer may delete only their own cart.",
+      "policyType": 0,
+      "operation": 3,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 1,
+            "leftOperand": "CustomerId",
+            "operator": 0,
+            "rightSource": 0,
+            "rightOperand": "UserId",
+            "staticValue": null,
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Cart",
+      "policyName": "only admin can delete data",
+      "policyDescription": "Only administrators may permanently delete records.",
+      "policyType": 0,
+      "operation": 3,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Order",
+      "policyName": "customer can read own orders",
+      "policyDescription": "A signed-in customer may read only their own orders.",
+      "policyType": 0,
+      "operation": 0,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 1,
+            "leftOperand": "CustomerId",
+            "operator": 0,
+            "rightSource": 0,
+            "rightOperand": "UserId",
+            "staticValue": null,
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Order",
+      "policyName": "staff can read all orders",
+      "policyDescription": "Placeholder: scope to Order manager / Customer-support / Finance roles once those exist (Phase 0 role model). Currently admin-only.",
+      "policyType": 0,
+      "operation": 0,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "Order",
+      "policyName": "staff can update orders",
+      "policyDescription": "Order status/payment/fulfillment transitions are staff-driven for now. A narrower customer-initiated cancel policy (status in Draft/PendingPayment AND CustomerId == self) is a follow-up, not yet implemented.",
+      "policyType": 0,
+      "operation": 2,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    }
+  ],
+  "security": [
+    {
+      "schemaId": "3da0567a-fe5d-4941-8441-462561fa8281",
+      "operation": 0,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "3da0567a-fe5d-4941-8441-462561fa8281",
+      "operation": 1,
+      "accessLevel": 1,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "3da0567a-fe5d-4941-8441-462561fa8281",
+      "operation": 2,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "3da0567a-fe5d-4941-8441-462561fa8281",
+      "operation": 3,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "7944ff3f-78e8-4f36-a730-3e268a6cfc80",
+      "operation": 0,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "7944ff3f-78e8-4f36-a730-3e268a6cfc80",
+      "operation": 1,
+      "accessLevel": 1,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "7944ff3f-78e8-4f36-a730-3e268a6cfc80",
+      "operation": 2,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "7944ff3f-78e8-4f36-a730-3e268a6cfc80",
+      "operation": 3,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "b906255d-0cd1-4586-9325-e8a806b04049",
+      "operation": 0,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "b906255d-0cd1-4586-9325-e8a806b04049",
+      "operation": 1,
+      "accessLevel": 1,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "b906255d-0cd1-4586-9325-e8a806b04049",
+      "operation": 2,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    },
+    {
+      "schemaId": "b906255d-0cd1-4586-9325-e8a806b04049",
+      "operation": 3,
+      "accessLevel": 3,
+      "policyType": 0,
+      "fieldNames": []
+    }
+  ]
+}

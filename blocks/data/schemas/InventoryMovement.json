@@ -1,0 +1,79 @@
+{
+  "schemaName": "InventoryMovement",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "MovementNumber",
+      "type": "String",
+      "description": "Organization-unique movement number.",
+      "isUniqueData": true
+    },
+    {
+      "name": "WarehouseId",
+      "type": "String",
+      "description": "Affected warehouse identifier."
+    },
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Denormalized product identifier."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Affected variant identifier."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "SKU snapshot."
+    },
+    {
+      "name": "MovementType",
+      "type": "String",
+      "description": "purchase_receipt, sale, return, reservation, adjustment, damage, transfer_out, transfer_in, or stock_count."
+    },
+    {
+      "name": "QuantityChange",
+      "type": "MovementQuantity",
+      "description": "Signed quantity changes."
+    },
+    {
+      "name": "BalanceAfter",
+      "type": "InventoryBalance",
+      "description": "Inventory balance after applying the movement."
+    },
+    {
+      "name": "Reference",
+      "type": "SourceReference",
+      "description": "Business document that caused the movement."
+    },
+    {
+      "name": "ReasonCode",
+      "type": "String",
+      "description": "Machine-readable reason."
+    },
+    {
+      "name": "Notes",
+      "type": "String",
+      "description": "Operator notes."
+    },
+    {
+      "name": "IdempotencyKey",
+      "type": "String",
+      "description": "Unique key preventing duplicate processing.",
+      "isUniqueData": true
+    },
+    {
+      "name": "PerformedBy",
+      "type": "Actor",
+      "description": "User, system, or integration responsible."
+    },
+    {
+      "name": "OccurredDate",
+      "type": "DateTime",
+      "description": "Business occurrence timestamp."
+    }
+  ],
+  "collectionName": "blx_InventoryMovements"
+}

@@ -1,0 +1,50 @@
+{
+  "schemaName": "InventoryReservation",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "ReservationNumber",
+      "type": "String",
+      "description": "Organization-unique reservation number.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Source",
+      "type": "SourceReference",
+      "description": "Cart, checkout, or order that owns the reservation."
+    },
+    {
+      "name": "CustomerId",
+      "type": "String",
+      "description": "Customer identifier.",
+      "isPIIData": true
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "active, committed, released, or expired."
+    },
+    {
+      "name": "Items",
+      "type": "ReservationItem",
+      "isArray": true,
+      "description": "Reserved inventory lines."
+    },
+    {
+      "name": "ExpiresDate",
+      "type": "DateTime",
+      "description": "Expiration timestamp for an active reservation."
+    },
+    {
+      "name": "CommittedDate",
+      "type": "DateTime",
+      "description": "Timestamp when stock was committed."
+    },
+    {
+      "name": "ReleasedDate",
+      "type": "DateTime",
+      "description": "Timestamp when stock was released."
+    }
+  ],
+  "collectionName": "blx_InventoryReservations"
+}

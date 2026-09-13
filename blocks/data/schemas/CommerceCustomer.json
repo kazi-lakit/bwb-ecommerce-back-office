@@ -1,0 +1,46 @@
+{
+  "schemaName": "CommerceCustomer",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "UserId",
+      "type": "String",
+      "description": "IAM user id this commerce profile belongs to. One profile per authenticated user.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Email",
+      "type": "String",
+      "description": "Contact email for order confirmations and receipts.",
+      "isPIIData": true
+    },
+    {
+      "name": "FirstName",
+      "type": "String",
+      "description": "Given name."
+    },
+    {
+      "name": "LastName",
+      "type": "String",
+      "description": "Family name."
+    },
+    {
+      "name": "Phone",
+      "type": "String",
+      "description": "Contact phone number.",
+      "isPIIData": true
+    },
+    {
+      "name": "Addresses",
+      "type": "Address",
+      "isArray": true,
+      "description": "Saved shipping/billing addresses for this customer."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Lifecycle status: active, inactive, or archived."
+    }
+  ],
+  "collectionName": "blx_CommerceCustomers"
+}

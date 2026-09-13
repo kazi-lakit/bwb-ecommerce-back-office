@@ -1,0 +1,41 @@
+{
+  "schemaName": "TransferItem",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Parent product identifier."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Variant being transferred."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "SKU snapshot."
+    },
+    {
+      "name": "RequestedQuantity",
+      "type": "Float",
+      "description": "Requested transfer quantity."
+    },
+    {
+      "name": "ShippedQuantity",
+      "type": "Float",
+      "description": "Quantity dispatched."
+    },
+    {
+      "name": "ReceivedQuantity",
+      "type": "Float",
+      "description": "Quantity received."
+    },
+    {
+      "name": "DamagedQuantity",
+      "type": "Float",
+      "description": "Quantity damaged during transfer."
+    }
+  ]
+}

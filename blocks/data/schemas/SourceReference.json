@@ -1,0 +1,21 @@
+{
+  "schemaName": "SourceReference",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Type",
+      "type": "String",
+      "description": "Source entity type such as order, cart, or purchase_order."
+    },
+    {
+      "name": "Id",
+      "type": "String",
+      "description": "Source entity identifier."
+    },
+    {
+      "name": "Number",
+      "type": "String",
+      "description": "Human-readable source number."
+    }
+  ]
+}

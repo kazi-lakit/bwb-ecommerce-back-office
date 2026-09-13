@@ -1,0 +1,49 @@
+{
+  "schemaName": "Category",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Category display name."
+    },
+    {
+      "name": "Slug",
+      "type": "String",
+      "description": "URL-safe unique category slug.",
+      "isUniqueData": true
+    },
+    {
+      "name": "ParentId",
+      "type": "String",
+      "description": "Immediate parent category identifier."
+    },
+    {
+      "name": "Ancestors",
+      "type": "CategoryAncestor",
+      "isArray": true,
+      "description": "Ordered ancestor path."
+    },
+    {
+      "name": "Level",
+      "type": "Int",
+      "description": "Depth in the category tree."
+    },
+    {
+      "name": "ImageUrl",
+      "type": "String",
+      "description": "Category image URL."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Lifecycle status."
+    },
+    {
+      "name": "SortOrder",
+      "type": "Int",
+      "description": "Display order."
+    }
+  ],
+  "collectionName": "blx_Categories"
+}

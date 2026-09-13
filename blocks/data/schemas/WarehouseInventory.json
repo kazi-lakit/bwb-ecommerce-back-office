@@ -1,0 +1,62 @@
+{
+  "schemaName": "WarehouseInventory",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "WarehouseId",
+      "type": "String",
+      "description": "Warehouse identifier."
+    },
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Denormalized parent product identifier."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Variant identifier."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "Denormalized SKU."
+    },
+    {
+      "name": "Quantity",
+      "type": "InventoryQuantity",
+      "description": "Inventory quantity buckets."
+    },
+    {
+      "name": "AvailableToSell",
+      "type": "Float",
+      "description": "OnHand minus unavailable and reserved quantities."
+    },
+    {
+      "name": "BinLocation",
+      "type": "BinLocation",
+      "description": "Primary storage bin."
+    },
+    {
+      "name": "ReorderPoint",
+      "type": "Float",
+      "description": "Low-stock threshold."
+    },
+    {
+      "name": "ReorderQuantity",
+      "type": "Float",
+      "description": "Suggested replenishment quantity."
+    },
+    {
+      "name": "LastCountedDate",
+      "type": "DateTime",
+      "description": "Most recent physical stock count timestamp."
+    },
+    {
+      "name": "Version",
+      "type": "Int",
+      "description": "Optimistic concurrency version."
+    }
+  ],
+  "collectionName": "blx_WarehouseInventory"
+}

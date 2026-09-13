@@ -1,0 +1,51 @@
+{
+  "schemaName": "CartItem",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Product this line refers to."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Sellable variant this line refers to."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "SKU snapshot at the time the line was added."
+    },
+    {
+      "name": "NameSnapshot",
+      "type": "String",
+      "description": "Product/variant display name snapshot, so the cart still reads correctly if the catalog changes later."
+    },
+    {
+      "name": "Slug",
+      "type": "String",
+      "description": "Product slug snapshot, so a cart line synced from another device can still link to the product page."
+    },
+    {
+      "name": "ImageUrl",
+      "type": "String",
+      "description": "Thumbnail image URL snapshot, so a cart line synced from another device can still render an image."
+    },
+    {
+      "name": "UnitPrice",
+      "type": "Float",
+      "description": "Snapshot of the variant's unit price when this line was added or last revalidated."
+    },
+    {
+      "name": "Quantity",
+      "type": "Float",
+      "description": "Quantity of this variant in the cart."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO currency code for UnitPrice."
+    }
+  ]
+}

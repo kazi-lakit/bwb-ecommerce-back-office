@@ -1,0 +1,36 @@
+{
+  "schemaName": "Media",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "MediaId",
+      "type": "String",
+      "description": "Unique media item identifier."
+    },
+    {
+      "name": "Type",
+      "type": "String",
+      "description": "Media type such as image or video."
+    },
+    {
+      "name": "Url",
+      "type": "String",
+      "description": "Public or signed media URL."
+    },
+    {
+      "name": "AltText",
+      "type": "String",
+      "description": "Accessible alternative text."
+    },
+    {
+      "name": "Position",
+      "type": "Int",
+      "description": "Display order."
+    },
+    {
+      "name": "IsPrimary",
+      "type": "Boolean",
+      "description": "Whether this is the primary media item."
+    }
+  ]
+}

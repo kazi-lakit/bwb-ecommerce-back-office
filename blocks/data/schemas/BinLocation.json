@@ -1,0 +1,31 @@
+{
+  "schemaName": "BinLocation",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Zone",
+      "type": "String",
+      "description": "Warehouse zone."
+    },
+    {
+      "name": "Aisle",
+      "type": "String",
+      "description": "Warehouse aisle."
+    },
+    {
+      "name": "Rack",
+      "type": "String",
+      "description": "Rack identifier."
+    },
+    {
+      "name": "Shelf",
+      "type": "String",
+      "description": "Shelf identifier."
+    },
+    {
+      "name": "Bin",
+      "type": "String",
+      "description": "Bin identifier."
+    }
+  ]
+}

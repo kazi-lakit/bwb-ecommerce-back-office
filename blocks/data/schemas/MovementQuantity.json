@@ -1,0 +1,26 @@
+{
+  "schemaName": "MovementQuantity",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "OnHand",
+      "type": "Float",
+      "description": "Signed change to on-hand quantity."
+    },
+    {
+      "name": "Reserved",
+      "type": "Float",
+      "description": "Signed change to reserved quantity."
+    },
+    {
+      "name": "Damaged",
+      "type": "Float",
+      "description": "Signed change to damaged quantity."
+    },
+    {
+      "name": "QualityHold",
+      "type": "Float",
+      "description": "Signed change to quality-hold quantity."
+    }
+  ]
+}

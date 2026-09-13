@@ -1,0 +1,36 @@
+{
+  "schemaName": "SupplierItem",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Supplied product variant."
+    },
+    {
+      "name": "SupplierSku",
+      "type": "String",
+      "description": "Supplier-specific SKU."
+    },
+    {
+      "name": "UnitCost",
+      "type": "Float",
+      "description": "Current quoted unit cost."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO 4217 currency code."
+    },
+    {
+      "name": "MinimumOrderQuantity",
+      "type": "Float",
+      "description": "Minimum quantity accepted by the supplier."
+    },
+    {
+      "name": "LeadTimeDays",
+      "type": "Int",
+      "description": "Expected lead time in days."
+    }
+  ]
+}

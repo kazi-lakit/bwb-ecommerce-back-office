@@ -1,0 +1,21 @@
+{
+  "schemaName": "CategoryAncestor",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "CategoryId",
+      "type": "String",
+      "description": "Ancestor category identifier."
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Ancestor category name snapshot."
+    },
+    {
+      "name": "Slug",
+      "type": "String",
+      "description": "Ancestor category slug snapshot."
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "schemaName": "PurchaseOrder",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "PurchaseOrderNumber",
+      "type": "String",
+      "description": "Organization-unique purchase order number.",
+      "isUniqueData": true
+    },
+    {
+      "name": "SupplierId",
+      "type": "String",
+      "description": "Supplier identifier."
+    },
+    {
+      "name": "WarehouseId",
+      "type": "String",
+      "description": "Receiving warehouse identifier."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "draft, submitted, approved, partially_received, received, cancelled, or closed."
+    },
+    {
+      "name": "OrderDate",
+      "type": "DateTime",
+      "description": "Date placed with the supplier."
+    },
+    {
+      "name": "ExpectedDeliveryDate",
+      "type": "DateTime",
+      "description": "Expected receipt date."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO 4217 currency code."
+    },
+    {
+      "name": "Items",
+      "type": "PurchaseOrderItem",
+      "isArray": true,
+      "description": "Purchase order lines."
+    },
+    {
+      "name": "Subtotal",
+      "type": "Float",
+      "description": "Sum before tax and shipping."
+    },
+    {
+      "name": "TaxAmount",
+      "type": "Float",
+      "description": "Total tax."
+    },
+    {
+      "name": "ShippingAmount",
+      "type": "Float",
+      "description": "Shipping and handling charges."
+    },
+    {
+      "name": "GrandTotal",
+      "type": "Float",
+      "description": "Final payable amount."
+    },
+    {
+      "name": "Notes",
+      "type": "String",
+      "description": "Buyer or receiving notes."
+    },
+    {
+      "name": "ApprovedBy",
+      "type": "String",
+      "description": "Approver user identifier."
+    },
+    {
+      "name": "ApprovedDate",
+      "type": "DateTime",
+      "description": "Approval timestamp."
+    }
+  ],
+  "collectionName": "blx_PurchaseOrders"
+}

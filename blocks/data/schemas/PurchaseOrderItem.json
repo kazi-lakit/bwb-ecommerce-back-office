@@ -1,0 +1,46 @@
+{
+  "schemaName": "PurchaseOrderItem",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Parent product identifier."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Ordered variant identifier."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "SKU snapshot."
+    },
+    {
+      "name": "OrderedQuantity",
+      "type": "Float",
+      "description": "Quantity ordered."
+    },
+    {
+      "name": "ReceivedQuantity",
+      "type": "Float",
+      "description": "Quantity received to date."
+    },
+    {
+      "name": "UnitCost",
+      "type": "Float",
+      "description": "Agreed unit cost."
+    },
+    {
+      "name": "TaxAmount",
+      "type": "Float",
+      "description": "Tax amount for this line."
+    },
+    {
+      "name": "LineTotal",
+      "type": "Float",
+      "description": "Total line amount."
+    }
+  ]
+}

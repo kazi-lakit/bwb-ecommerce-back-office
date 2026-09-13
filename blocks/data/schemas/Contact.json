@@ -1,0 +1,23 @@
+{
+  "schemaName": "Contact",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Contact person name."
+    },
+    {
+      "name": "Email",
+      "type": "String",
+      "description": "Contact email address.",
+      "isPIIData": true
+    },
+    {
+      "name": "Phone",
+      "type": "String",
+      "description": "Contact telephone number.",
+      "isPIIData": true
+    }
+  ]
+}

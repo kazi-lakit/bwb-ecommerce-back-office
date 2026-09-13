@@ -1,0 +1,11 @@
+{
+  "project": {
+    "tenantId": "",
+    "apiUrl": "https://api.seliseblocks.com",
+    "appDomain": ""
+  },
+  "data": {
+    "schemas": "blocks/data/schemas",
+    "rules": "blocks/data/rules.json"
+  }
+}

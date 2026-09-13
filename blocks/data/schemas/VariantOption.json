@@ -1,0 +1,22 @@
+{
+  "schemaName": "VariantOption",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Code",
+      "type": "String",
+      "description": "Stable option code such as color or size."
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Option display name."
+    },
+    {
+      "name": "Values",
+      "type": "String",
+      "isArray": true,
+      "description": "Allowed option values."
+    }
+  ]
+}

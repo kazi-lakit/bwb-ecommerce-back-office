@@ -1,0 +1,53 @@
+{
+  "schemaName": "Cart",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "CustomerId",
+      "type": "String",
+      "description": "IAM UserId of the cart's owner. Set from the authenticated caller on create, never from client input."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "active, abandoned, or converted (once checked out into an Order)."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO currency code for all monetary fields on this cart."
+    },
+    {
+      "name": "Items",
+      "type": "CartItem",
+      "isArray": true,
+      "description": "Line items currently in the cart."
+    },
+    {
+      "name": "CouponCode",
+      "type": "String",
+      "description": "Applied coupon code, if any. Revalidate against Coupon rules at checkout, not trusted as-is."
+    },
+    {
+      "name": "SubTotal",
+      "type": "Float",
+      "description": "Sum of line totals before discount."
+    },
+    {
+      "name": "DiscountTotal",
+      "type": "Float",
+      "description": "Total discount applied by CouponCode/promotions."
+    },
+    {
+      "name": "Total",
+      "type": "Float",
+      "description": "SubTotal minus DiscountTotal. Revalidate server-side at checkout \u2014 never trust a client-computed Total for payment."
+    },
+    {
+      "name": "SalesChannelType",
+      "type": "String",
+      "description": "Ecommerce, POS, MobileApp, Marketplace, or Wholesale \u2014 which channel this cart belongs to."
+    }
+  ],
+  "collectionName": "blx_Carts"
+}

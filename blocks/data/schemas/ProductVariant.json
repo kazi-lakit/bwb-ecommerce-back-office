@@ -1,0 +1,75 @@
+{
+  "schemaName": "ProductVariant",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Parent product identifier."
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Variant display name."
+    },
+    {
+      "name": "Sku",
+      "type": "String",
+      "description": "Organization-unique stock keeping unit.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Barcode",
+      "type": "String",
+      "description": "UPC, EAN, ISBN, or internal barcode.",
+      "isUniqueData": true
+    },
+    {
+      "name": "OptionValues",
+      "type": "OptionValue",
+      "isArray": true,
+      "description": "Selected option values."
+    },
+    {
+      "name": "Pricing",
+      "type": "Pricing",
+      "description": "Variant pricing."
+    },
+    {
+      "name": "Dimensions",
+      "type": "Dimensions",
+      "description": "Shipping dimensions."
+    },
+    {
+      "name": "TaxCode",
+      "type": "String",
+      "description": "Tax classification code."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Lifecycle status."
+    },
+    {
+      "name": "IsInventoryTracked",
+      "type": "Boolean",
+      "description": "Whether stock is tracked for this variant."
+    },
+    {
+      "name": "AllowBackorder",
+      "type": "Boolean",
+      "description": "Whether backorders are permitted."
+    },
+    {
+      "name": "ReorderPoint",
+      "type": "Float",
+      "description": "Default low-stock threshold."
+    },
+    {
+      "name": "ReorderQuantity",
+      "type": "Float",
+      "description": "Default replenishment quantity."
+    }
+  ],
+  "collectionName": "blx_ProductVariants"
+}

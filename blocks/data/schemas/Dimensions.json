@@ -1,0 +1,36 @@
+{
+  "schemaName": "Dimensions",
+  "schemaType": 2,
+  "fields": [
+    {
+      "name": "Weight",
+      "type": "Float",
+      "description": "Weight value."
+    },
+    {
+      "name": "WeightUnit",
+      "type": "String",
+      "description": "Weight unit such as kg or lb."
+    },
+    {
+      "name": "Length",
+      "type": "Float",
+      "description": "Length value."
+    },
+    {
+      "name": "Width",
+      "type": "Float",
+      "description": "Width value."
+    },
+    {
+      "name": "Height",
+      "type": "Float",
+      "description": "Height value."
+    },
+    {
+      "name": "DimensionUnit",
+      "type": "String",
+      "description": "Dimension unit such as cm or in."
+    }
+  ]
+}

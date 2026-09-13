@@ -1,0 +1,103 @@
+{
+  "schemaName": "Product",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Product display name."
+    },
+    {
+      "name": "Slug",
+      "type": "String",
+      "description": "URL-safe unique product slug.",
+      "isUniqueData": true
+    },
+    {
+      "name": "ProductType",
+      "type": "String",
+      "description": "Product type: physical, digital, or service."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Lifecycle status: draft, active, inactive, or archived."
+    },
+    {
+      "name": "ShortDescription",
+      "type": "String",
+      "description": "Short catalog description."
+    },
+    {
+      "name": "LongDescription",
+      "type": "String",
+      "description": "Full product description."
+    },
+    {
+      "name": "CategoryIds",
+      "type": "String",
+      "isArray": true,
+      "description": "Assigned category identifiers."
+    },
+    {
+      "name": "BrandId",
+      "type": "String",
+      "description": "Associated brand identifier."
+    },
+    {
+      "name": "Media",
+      "type": "Media",
+      "isArray": true,
+      "description": "Product media gallery."
+    },
+    {
+      "name": "Attributes",
+      "type": "Attribute",
+      "isArray": true,
+      "description": "Shared product attributes."
+    },
+    {
+      "name": "VariantOptions",
+      "type": "VariantOption",
+      "isArray": true,
+      "description": "Options used to construct variants."
+    },
+    {
+      "name": "DefaultVariantId",
+      "type": "String",
+      "description": "Default sellable variant."
+    },
+    {
+      "name": "IsInventoryTracked",
+      "type": "Boolean",
+      "description": "Whether stock is tracked."
+    },
+    {
+      "name": "AllowBackorder",
+      "type": "Boolean",
+      "description": "Whether orders may exceed available inventory."
+    },
+    {
+      "name": "SeoTitle",
+      "type": "String",
+      "description": "Search result title."
+    },
+    {
+      "name": "SeoDescription",
+      "type": "String",
+      "description": "Search result description."
+    },
+    {
+      "name": "SeoKeywords",
+      "type": "String",
+      "isArray": true,
+      "description": "SEO keywords."
+    },
+    {
+      "name": "SchemaVersion",
+      "type": "Int",
+      "description": "Product document schema version."
+    }
+  ],
+  "collectionName": "blx_Products"
+}

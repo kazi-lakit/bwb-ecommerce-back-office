@@ -1,0 +1,55 @@
+{
+  "schemaName": "Supplier",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "Code",
+      "type": "String",
+      "description": "Organization-unique supplier code.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Name",
+      "type": "String",
+      "description": "Supplier legal or trading name."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "active, inactive, or blocked."
+    },
+    {
+      "name": "Contact",
+      "type": "Contact",
+      "description": "Primary supplier contact."
+    },
+    {
+      "name": "Address",
+      "type": "Address",
+      "description": "Supplier address."
+    },
+    {
+      "name": "TaxNumber",
+      "type": "String",
+      "description": "Supplier tax or VAT number.",
+      "isPIIData": true
+    },
+    {
+      "name": "PaymentTermsDays",
+      "type": "Int",
+      "description": "Default payment term in days."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "Default ISO 4217 settlement currency."
+    },
+    {
+      "name": "Items",
+      "type": "SupplierItem",
+      "isArray": true,
+      "description": "Supplier catalog and terms."
+    }
+  ],
+  "collectionName": "blx_Suppliers"
+}
