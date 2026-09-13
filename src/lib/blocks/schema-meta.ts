@@ -96,6 +96,9 @@ export const COMPLEX_TYPES: Record<string, FieldMeta[]> = {
     { name: "Damaged", type: "Float", isArray: false, description: "Quantity unavailable because it is damaged." },
     { name: "QualityHold", type: "Float", isArray: false, description: "Quantity unavailable pending inspection." },
     { name: "Incoming", type: "Float", isArray: false, description: "Confirmed quantity expected from purchase orders or transfers." },
+    { name: "Blocked", type: "Float", isArray: false, description: "Quantity administratively withheld from sale (hold, recall, legal) but still physically present." },
+    { name: "Backordered", type: "Float", isArray: false, description: "Quantity sold beyond on-hand stock and owed to customers." },
+    { name: "InTransit", type: "Float", isArray: false, description: "Quantity dispatched on an outbound transfer, no longer on hand here and not yet received elsewhere." },
   ],
   "BinLocation": [
     { name: "Zone", type: "String", isArray: false, description: "Warehouse zone." },
@@ -318,7 +321,7 @@ export const ENTITY_SCHEMAS: Record<string, EntityMeta> = {
       { name: "ReorderPoint", type: "Float", isArray: false, description: "Low-stock threshold." },
       { name: "ReorderQuantity", type: "Float", isArray: false, description: "Suggested replenishment quantity." },
       { name: "LastCountedDate", type: "DateTime", isArray: false, description: "Most recent physical stock count timestamp." },
-      { name: "Version", type: "Long", isArray: false, description: "Optimistic concurrency version." },
+      { name: "Version", type: "Int", isArray: false, description: "Optimistic concurrency version." },
     ],
   },
   "InventoryReservation": {

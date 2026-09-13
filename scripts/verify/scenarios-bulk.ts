@@ -1,6 +1,17 @@
 import { csvRowToPayload, exportColumns, jsonRowToPayload, parseJsonRows } from "@/lib/blocks/bulk";
 import type { EntityMeta } from "@/lib/blocks/schema-meta";
 
+// A minimal Product-shaped meta — real enough that "Product" triggers the Variants column,
+// but `parseVariantEntry` itself reads ProductVariant's *real* field list from schema-meta.ts
+// (Name, Sku, Barcode, Pricing, Dimensions, TaxCode, Status, …), not this fixture.
+const productMeta: EntityMeta = {
+  schemaName: "Product",
+  collectionName: "blx_Products",
+  readAccessLevel: 2, writeAccessLevel: 1, editAccessLevel: 1, deleteAccessLevel: 3,
+  rowLevelPolicies: [],
+  fields: [{ name: "Name", type: "String", isArray: false, required: true }],
+};
+
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail = "") {
   if (cond) { pass++; console.log(`  ok   ${name}`); }
@@ -143,6 +154,63 @@ export async function run(): Promise<number> {
     threw = true;
   }
   check("a JSON object (not array) throws, doesn't guess", threw);
+
+  console.log("\nB17. a Product's Variants column (CSV cell, JSON text) parses into real variants");
+  const variantsJson = JSON.stringify([
+    { Sku: "CHAIR-RED", Name: "Red", Pricing: { Currency: "USD", RegularPrice: 199 }, Stock: [{ WarehouseCode: "WH1", OnHand: 10, Reserved: 2 }] },
+  ]);
+  const withVariants = csvRowToPayload(productMeta, { Name: "Chair", Variants: variantsJson }, 2);
+  check("no errors", withVariants.errors.length === 0, withVariants.errors.join("; "));
+  check("one variant", withVariants.variants?.length === 1);
+  check("sku carried", withVariants.variants?.[0].sku === "CHAIR-RED");
+  check("variant payload has Name", withVariants.variants?.[0].payload.Name === "Red");
+  check("variant payload has Pricing object", (withVariants.variants?.[0].payload.Pricing as { RegularPrice: number })?.RegularPrice === 199);
+  check("variant payload excludes Sku duplication issues", withVariants.variants?.[0].payload.Sku === "CHAIR-RED");
+  check("one stock entry", withVariants.variants?.[0].stock.length === 1);
+  check("stock warehouse code", withVariants.variants?.[0].stock[0].warehouseCode === "WH1");
+  check("stock quantity coerced", withVariants.variants?.[0].stock[0].quantity.OnHand === 10 && withVariants.variants?.[0].stock[0].quantity.Reserved === 2);
+
+  console.log("\nB18. a variant with no Sku is refused, not silently skipped");
+  const noSku = csvRowToPayload(productMeta, { Name: "Chair", Variants: JSON.stringify([{ Name: "Red" }]) }, 2);
+  check("error reported", noSku.errors.some((e) => e.includes("Sku is required")), noSku.errors.join("; "));
+  check("no variant produced for the bad entry", (noSku.variants ?? []).length === 0);
+
+  console.log("\nB19. stock with no WarehouseCode is refused");
+  const noWarehouse = csvRowToPayload(
+    productMeta,
+    { Name: "Chair", Variants: JSON.stringify([{ Sku: "X", Stock: [{ OnHand: 5 }] }]) },
+    2
+  );
+  check("error reported", noWarehouse.errors.some((e) => e.includes("WarehouseCode is required")), noWarehouse.errors.join("; "));
+  check("variant still created (stock is optional)", noWarehouse.variants?.length === 1);
+  check("but with no stock rows", noWarehouse.variants?.[0].stock.length === 0);
+
+  console.log("\nB20. nonsense stock quantities are refused");
+  const badQty = csvRowToPayload(
+    productMeta,
+    { Name: "Chair", Variants: JSON.stringify([{ Sku: "X", Stock: [{ WarehouseCode: "WH1", OnHand: "lots" }] }]) },
+    2
+  );
+  check("error reported", badQty.errors.some((e) => e.includes("OnHand isn't a number")), badQty.errors.join("; "));
+
+  console.log("\nB21. an empty or absent Variants column means no variants, no errors");
+  check("absent column", csvRowToPayload(productMeta, { Name: "Chair" }, 2).variants === undefined);
+  check("blank cell", csvRowToPayload(productMeta, { Name: "Chair", Variants: "" }, 2).variants === undefined);
+
+  console.log("\nB22. Variants also works from a JSON import row (already a real array, not a string)");
+  const jsonVariantRow = jsonRowToPayload(
+    productMeta,
+    { Name: "Chair", Variants: [{ Sku: "CHAIR-BLU", Stock: [{ WarehouseCode: "WH2", OnHand: 3 }] }] },
+    1
+  );
+  check("no errors", jsonVariantRow.errors.length === 0, jsonVariantRow.errors.join("; "));
+  check("one variant", jsonVariantRow.variants?.length === 1);
+  check("sku carried", jsonVariantRow.variants?.[0].sku === "CHAIR-BLU");
+  check("stock carried", jsonVariantRow.variants?.[0].stock[0].warehouseCode === "WH2");
+
+  console.log("\nB23. malformed Variants JSON in a CSV cell is refused, not silently ignored");
+  const badVariantsCell = csvRowToPayload(productMeta, { Name: "Chair", Variants: "not json" }, 2);
+  check("error reported", badVariantsCell.errors.some((e) => e.includes("Variants")), badVariantsCell.errors.join("; "));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   return fail;

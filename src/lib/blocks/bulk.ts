@@ -1,4 +1,4 @@
-import { createEntityApi, type EntityListParams } from "./collections";
+import { createEntityApi, getEntityMeta, runBatchList, type EntityListParams } from "./collections";
 import { isComplexFieldType, type EntityMeta } from "./schema-meta";
 import { toCsv, parseCsv, type ParsedCsv } from "@/lib/csv";
 
@@ -16,10 +16,17 @@ const SYSTEM_COLUMNS = ["ItemId", "CreatedDate", "LastUpdatedDate", "CreatedBy",
 const MAX_EXPORT_ROWS = 5000;
 const EXPORT_PAGE_SIZE = 200;
 
+/** Product's real fields, plus one synthetic column carrying its variants (and each
+ * variant's optional per-warehouse stock) — see `VARIANT_FIELDS`/`applyRows` below. Not a
+ * real Product field on the Data Gateway; assembled/consumed only by this module. */
+const VARIANTS_COLUMN = "Variants";
+
 export function exportColumns(meta: EntityMeta): string[] {
   // ItemId first: it's what makes a re-import an update. The other system columns are
   // included for context but ignored on the way back in — see csvRowToPayload.
-  return ["ItemId", ...meta.fields.map((f) => f.name), "CreatedDate", "LastUpdatedDate"];
+  const fieldColumns = meta.fields.map((f) => f.name);
+  if (meta.schemaName === "Product") fieldColumns.push(VARIANTS_COLUMN);
+  return ["ItemId", ...fieldColumns, "CreatedDate", "LastUpdatedDate"];
 }
 
 export type BulkFormat = "csv" | "json";
@@ -51,6 +58,78 @@ function toJson(rows: Record<string, unknown>[], columns: string[]): string {
   return JSON.stringify(picked, null, 2);
 }
 
+/** Pages through `schemaName` under `where` until exhausted (capped, like the main export
+ * loop) — used for the side-fetches a Product export needs (its variants, their stock, the
+ * warehouses to turn `WarehouseId` back into a portable `Code`). */
+async function fetchAll(schemaName: string, where: EntityListParams["where"], cap = MAX_EXPORT_ROWS): Promise<Record<string, unknown>[]> {
+  const api = createEntityApi(schemaName);
+  const out: Record<string, unknown>[] = [];
+  for (let pageNo = 1; out.length < cap; pageNo += 1) {
+    const page = await api.list({ pageNo, pageSize: EXPORT_PAGE_SIZE, where });
+    out.push(...page.items);
+    if (page.items.length === 0 || out.length >= page.totalCount) break;
+  }
+  return out;
+}
+
+/**
+ * Embeds each product's variants (and each variant's stock) into its row's `Variants`
+ * column, in exactly the shape `parseVariantEntry`/`applyProductRows` expect back on
+ * import — so exporting Products and re-importing the file unchanged is a no-op, not a
+ * silent loss of the variant/stock data this module can now also write.
+ */
+async function embedProductVariants(rows: Record<string, unknown>[]): Promise<void> {
+  const productIds = rows.map((r) => r.ItemId as string | undefined).filter((id): id is string => Boolean(id));
+  if (productIds.length === 0) return;
+
+  const variants = await fetchAll("ProductVariant", { ProductId: { in: productIds } });
+  const variantIds = variants.map((v) => v.ItemId as string | undefined).filter((id): id is string => Boolean(id));
+
+  // Stock and warehouses don't depend on each other, so — same optimization as the rest of
+  // this codebase's reads — they go out as one aliased GraphQL request, not two round trips.
+  let stock: Record<string, unknown>[] = [];
+  let warehouses: Record<string, unknown>[] = [];
+  if (variantIds.length > 0) {
+    const batch = await runBatchList([
+      { key: "stock", schemaName: "WarehouseInventory", params: { where: { VariantId: { in: variantIds } }, pageSize: MAX_EXPORT_ROWS } },
+      { key: "warehouses", schemaName: "Warehouse", params: { pageSize: MAX_EXPORT_ROWS } },
+    ]);
+    stock = batch.stock.items;
+    warehouses = batch.warehouses.items;
+  }
+
+  const warehouseCodeById = new Map(warehouses.map((w) => [w.ItemId as string, w.Code as string]));
+
+  const stockByVariantId = new Map<string, Record<string, unknown>[]>();
+  for (const s of stock) {
+    const variantId = s.VariantId as string | undefined;
+    if (!variantId) continue;
+    const quantity = (s.Quantity as Record<string, unknown> | undefined) ?? {};
+    const entry: Record<string, unknown> = { WarehouseCode: warehouseCodeById.get(s.WarehouseId as string) ?? s.WarehouseId, ...quantity };
+    if (s.ReorderPoint !== undefined && s.ReorderPoint !== null) entry.ReorderPoint = s.ReorderPoint;
+    if (s.ReorderQuantity !== undefined && s.ReorderQuantity !== null) entry.ReorderQuantity = s.ReorderQuantity;
+    const list = stockByVariantId.get(variantId) ?? [];
+    list.push(entry);
+    stockByVariantId.set(variantId, list);
+  }
+
+  const variantsByProductId = new Map<string, Record<string, unknown>[]>();
+  for (const v of variants) {
+    const productId = v.ProductId as string | undefined;
+    const variantId = v.ItemId as string | undefined;
+    if (!productId || !variantId) continue;
+    const { ItemId: _itemId, CreatedDate: _c, LastUpdatedDate: _u, CreatedBy: _cb, LastUpdatedBy: _ub, ...fields } = v;
+    const list = variantsByProductId.get(productId) ?? [];
+    list.push({ ...fields, Stock: stockByVariantId.get(variantId) ?? [] });
+    variantsByProductId.set(productId, list);
+  }
+
+  for (const row of rows) {
+    const id = row.ItemId as string | undefined;
+    row[VARIANTS_COLUMN] = id ? variantsByProductId.get(id) ?? [] : [];
+  }
+}
+
 export async function exportEntity(
   meta: EntityMeta,
   where: EntityListParams["where"],
@@ -67,6 +146,8 @@ export async function exportEntity(
     if (page.items.length === 0 || rows.length >= page.totalCount) break;
   }
 
+  if (meta.schemaName === "Product" && rows.length > 0) await embedProductVariants(rows);
+
   const columns = exportColumns(meta);
   const datestamp = new Date().toISOString().slice(0, 10);
   return {
@@ -79,12 +160,128 @@ export async function exportEntity(
   };
 }
 
+const STOCK_QUANTITY_FIELDS = [
+  "OnHand", "Reserved", "Damaged", "QualityHold", "Incoming", "Blocked", "Backordered", "InTransit",
+] as const;
+
+export interface ImportedStockEntry {
+  /** A `Warehouse.Code`, not an `ItemId` — the warehouse's real id doesn't exist in a
+   * portable import file any more than a Product's own does; it's resolved at apply time. */
+  warehouseCode: string;
+  quantity: Partial<Record<(typeof STOCK_QUANTITY_FIELDS)[number], number>>;
+  reorderPoint?: number;
+  reorderQuantity?: number;
+}
+
+export interface ImportedVariant {
+  sku: string;
+  /** Every other `ProductVariant` field (Name, Pricing, Dimensions, …) except `ProductId`,
+   * which is filled in once the parent product's real id is known — see `applyRows`. */
+  payload: Record<string, unknown>;
+  /** Empty when the row didn't provide stock — creating a variant with no stock rows is
+   * entirely valid (this feature is "able to provide data", not "must provide data"). */
+  stock: ImportedStockEntry[];
+}
+
+/**
+ * One variant entry from a Product row's `Variants` column, validated against
+ * `ProductVariant`'s real field list (everything but `ProductId`, which only exists once
+ * this row's product is created) plus the `Stock` extension. Values are always run through
+ * `coerceJson` here — by the time a CSV cell's `Variants` JSON has been `JSON.parse`d, its
+ * contents are exactly as typed as a JSON import's ever were, so there's no separate
+ * CSV-flavoured coercion needed at this level, only at the outer column.
+ */
+function parseVariantEntry(raw: unknown, index: number): { value?: ImportedVariant; errors: string[] } {
+  const label = `Variants[${index}]`;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { errors: [`${label}: expected an object`] };
+  }
+  const obj = raw as Record<string, unknown>;
+  const sku = typeof obj.Sku === "string" ? obj.Sku.trim() : "";
+  const errors: string[] = [];
+  if (!sku) errors.push(`${label}: Sku is required`);
+
+  const payload: Record<string, unknown> = {};
+  const variantMeta = getEntityMeta("ProductVariant");
+  for (const field of variantMeta.fields) {
+    if (field.name === "ProductId" || field.name === "Sku") continue;
+    const value = obj[field.name];
+    if (value === undefined || value === null || value === "") continue;
+    const { value: coerced, error } = coerceJson(value, field);
+    if (error) errors.push(`${label} ${error}`);
+    else payload[field.name] = coerced;
+  }
+  if (sku) payload.Sku = sku;
+
+  const stock: ImportedStockEntry[] = [];
+  const rawStock = obj[STOCK_COLUMN];
+  if (rawStock !== undefined && rawStock !== null) {
+    if (!Array.isArray(rawStock)) {
+      errors.push(`${label}: ${STOCK_COLUMN} must be an array`);
+    } else {
+      rawStock.forEach((entry, si) => {
+        const stockLabel = `${label}.${STOCK_COLUMN}[${si}]`;
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          errors.push(`${stockLabel}: expected an object`);
+          return;
+        }
+        const so = entry as Record<string, unknown>;
+        const warehouseCode = typeof so.WarehouseCode === "string" ? so.WarehouseCode.trim() : "";
+        if (!warehouseCode) {
+          errors.push(`${stockLabel}: WarehouseCode is required`);
+          return;
+        }
+        const quantity: ImportedStockEntry["quantity"] = {};
+        for (const qtyField of STOCK_QUANTITY_FIELDS) {
+          const v = so[qtyField];
+          if (v === undefined || v === null || v === "") continue;
+          const n = typeof v === "number" ? v : Number(v);
+          if (!Number.isFinite(n)) {
+            errors.push(`${stockLabel}: ${qtyField} isn't a number`);
+            continue;
+          }
+          quantity[qtyField] = n;
+        }
+        const reorderPoint = numberOrUndefined(so.ReorderPoint);
+        const reorderQuantity = numberOrUndefined(so.ReorderQuantity);
+        stock.push({ warehouseCode, quantity, reorderPoint, reorderQuantity });
+      });
+    }
+  }
+
+  return { value: sku ? { sku, payload, stock } : undefined, errors };
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+const STOCK_COLUMN = "Stock";
+
+/** Parses a Product row's whole `Variants` array (already-real JSON by the time this runs —
+ * see `parseVariantEntry`). */
+function parseVariants(raw: unknown): { variants: ImportedVariant[]; errors: string[] } {
+  if (!Array.isArray(raw)) return { variants: [], errors: [`${VARIANTS_COLUMN}: expected an array`] };
+  const variants: ImportedVariant[] = [];
+  const errors: string[] = [];
+  raw.forEach((entry, i) => {
+    const { value, errors: entryErrors } = parseVariantEntry(entry, i);
+    if (value) variants.push(value);
+    errors.push(...entryErrors);
+  });
+  return { variants, errors };
+}
+
 export interface RowResult {
   /** 1-based, counting the header as line 1, so it matches what a spreadsheet shows. */
   line: number;
   itemId?: string;
   payload: Record<string, unknown>;
   errors: string[];
+  /** Only ever set for a `Product` row whose `Variants` column had at least one entry. */
+  variants?: ImportedVariant[];
 }
 
 function coerce(
@@ -141,9 +338,22 @@ export function csvRowToPayload(meta: EntityMeta, row: Record<string, string>, l
   const payload: Record<string, unknown> = {};
   const errors: string[] = [];
   const known = new Set(meta.fields.map((f) => f.name));
+  let variants: ImportedVariant[] | undefined;
 
   for (const [column, raw] of Object.entries(row)) {
     if (SYSTEM_COLUMNS.includes(column)) continue;
+    if (meta.schemaName === "Product" && column === VARIANTS_COLUMN) {
+      if (raw === "") continue;
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        const result = parseVariants(parsed);
+        if (result.variants.length > 0) variants = result.variants;
+        errors.push(...result.errors);
+      } catch {
+        errors.push(`${VARIANTS_COLUMN}: expected JSON (as exported), got ${JSON.stringify(raw.slice(0, 30))}`);
+      }
+      continue;
+    }
     if (!known.has(column)) {
       errors.push(`unknown column "${column}"`);
       continue;
@@ -161,7 +371,7 @@ export function csvRowToPayload(meta: EntityMeta, row: Record<string, string>, l
     }
   }
 
-  return { line, itemId: row.ItemId || undefined, payload, errors };
+  return { line, itemId: row.ItemId || undefined, payload, errors, variants };
 }
 
 export function parseRows(meta: EntityMeta, parsed: ParsedCsv): RowResult[] {
@@ -224,9 +434,17 @@ export function jsonRowToPayload(meta: EntityMeta, row: Record<string, unknown>,
   const payload: Record<string, unknown> = {};
   const errors: string[] = [];
   const known = new Set(meta.fields.map((f) => f.name));
+  let variants: ImportedVariant[] | undefined;
 
   for (const [column, raw] of Object.entries(row)) {
     if (SYSTEM_COLUMNS.includes(column)) continue;
+    if (meta.schemaName === "Product" && column === VARIANTS_COLUMN) {
+      if (raw === null || raw === undefined) continue;
+      const result = parseVariants(raw);
+      if (result.variants.length > 0) variants = result.variants;
+      errors.push(...result.errors);
+      continue;
+    }
     if (!known.has(column)) {
       errors.push(`unknown column "${column}"`);
       continue;
@@ -245,7 +463,7 @@ export function jsonRowToPayload(meta: EntityMeta, row: Record<string, unknown>,
   }
 
   const itemId = typeof row.ItemId === "string" && row.ItemId ? row.ItemId : undefined;
-  return { line, itemId, payload, errors };
+  return { line, itemId, payload, errors, variants };
 }
 
 /**
@@ -282,6 +500,10 @@ export interface ImportOutcome {
   created: number;
   updated: number;
   failed: { line: number; message: string }[];
+  /** Only meaningful for a `Product` import that actually carried a `Variants` column. */
+  variantsCreated?: number;
+  variantsUpdated?: number;
+  stockWritten?: number;
 }
 
 /**
@@ -291,8 +513,15 @@ export interface ImportOutcome {
  * applied. That's reported per line rather than hidden behind a single "import failed" —
  * knowing row 34 is the one that broke, and that 1–33 landed, is the difference between
  * fixing a cell and re-importing blind.
+ *
+ * `Product` rows get one extra pass — see `applyProductRows` — since a product's variants
+ * (and each variant's optional per-warehouse stock) don't exist as their own import rows;
+ * they ride along on the product's own row and are applied right after it, using the
+ * product's just-created-or-updated real `ItemId`.
  */
 export async function applyRows(meta: EntityMeta, rows: RowResult[]): Promise<ImportOutcome> {
+  if (meta.schemaName === "Product") return applyProductRows(rows);
+
   const api = createEntityApi(meta.schemaName);
   const outcome: ImportOutcome = { created: 0, updated: 0, failed: [] };
 
@@ -311,6 +540,168 @@ export async function applyRows(meta: EntityMeta, rows: RowResult[]): Promise<Im
       }
     } catch (error) {
       outcome.failed.push({ line: row.line, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  return outcome;
+}
+
+/** `OnHand - Reserved - Damaged - QualityHold - Blocked` — the same formula
+ * `inventory-ops.ts`'s `computeAvailable` uses; kept in sync with it deliberately. */
+function computeAvailableToSell(quantity: ImportedStockEntry["quantity"]): number {
+  return (
+    (quantity.OnHand ?? 0) -
+    (quantity.Reserved ?? 0) -
+    (quantity.Damaged ?? 0) -
+    (quantity.QualityHold ?? 0) -
+    (quantity.Blocked ?? 0)
+  );
+}
+
+/**
+ * The Product-specific import path: create/update the product itself, then for each of its
+ * `Variants` entries create/update a `ProductVariant`, then for each variant's `Stock`
+ * entries create/update a `WarehouseInventory` row. All three are separate schemas/
+ * collections with no batch-mutation or transaction between them (same platform limit the
+ * module doc above already lives with) — a failure partway through one product's variants
+ * still leaves the product and any already-applied variants/stock in place, reported
+ * per-line rather than losing that context behind one failure message.
+ *
+ * Re-importing a previous export must not duplicate what's already there: a variant is
+ * matched to an existing one by `Sku` (its natural key — the import file has no way to
+ * carry a variant's own `ItemId` the way a product row carries its own), and a stock row is
+ * matched by the `(VariantId, WarehouseId)` pair `WarehouseDetailPage`'s own admin screens
+ * treat as that natural key — see `BLOCKS_FEATURE_SUGGESTIONS.md`'s note that nothing
+ * enforces it as a real constraint yet, which is exactly why this checks first rather than
+ * trusting a blind create not to produce a second, conflicting balance row.
+ */
+async function applyProductRows(rows: RowResult[]): Promise<ImportOutcome> {
+  const productApi = createEntityApi("Product");
+  const variantApi = createEntityApi("ProductVariant");
+  const stockApi = createEntityApi("WarehouseInventory");
+  const outcome: ImportOutcome = { created: 0, updated: 0, failed: [], variantsCreated: 0, variantsUpdated: 0, stockWritten: 0 };
+
+  const okRows = rows.filter((r) => r.errors.length === 0);
+  for (const row of rows) {
+    if (row.errors.length > 0) outcome.failed.push({ line: row.line, message: row.errors.join("; ") });
+  }
+
+  // Pre-fetch every warehouse code this import references, once, rather than per stock row.
+  const warehouseCodes = new Set<string>();
+  for (const row of okRows) {
+    for (const variant of row.variants ?? []) {
+      for (const stock of variant.stock) warehouseCodes.add(stock.warehouseCode);
+    }
+  }
+  const warehouseIdByCode = new Map<string, string>();
+  if (warehouseCodes.size > 0) {
+    const warehouses = await createEntityApi("Warehouse").list({ where: { Code: { in: Array.from(warehouseCodes) } }, pageSize: warehouseCodes.size });
+    for (const w of warehouses.items) {
+      const code = w.Code as string | undefined;
+      const id = (w.ItemId ?? w.itemId) as string | undefined;
+      if (code && id) warehouseIdByCode.set(code, id);
+    }
+  }
+
+  // Pre-fetch any existing variant sharing a SKU this import uses, so re-importing a
+  // previous export updates the same variant instead of creating a duplicate.
+  const skus = new Set<string>();
+  for (const row of okRows) for (const variant of row.variants ?? []) skus.add(variant.sku);
+  const existingVariantIdBySku = new Map<string, string>();
+  if (skus.size > 0) {
+    const existing = await variantApi.list({ where: { Sku: { in: Array.from(skus) } }, pageSize: skus.size });
+    for (const v of existing.items) {
+      const sku = v.Sku as string | undefined;
+      const id = (v.ItemId ?? v.itemId) as string | undefined;
+      if (sku && id) existingVariantIdBySku.set(sku, id);
+    }
+  }
+
+  for (const row of okRows) {
+    let productId: string;
+    try {
+      if (row.itemId) {
+        await productApi.update(row.itemId, row.payload);
+        outcome.updated += 1;
+        productId = row.itemId;
+      } else {
+        const result = await productApi.create(row.payload);
+        if (!result.itemId) throw new Error(result.message ?? "Product created with no itemId returned");
+        outcome.created += 1;
+        productId = result.itemId;
+      }
+    } catch (error) {
+      outcome.failed.push({ line: row.line, message: error instanceof Error ? error.message : String(error) });
+      continue;
+    }
+
+    for (const variant of row.variants ?? []) {
+      let variantId: string;
+      try {
+        const existingId = existingVariantIdBySku.get(variant.sku);
+        if (existingId) {
+          await variantApi.update(existingId, { ...variant.payload, ProductId: productId });
+          outcome.variantsUpdated = (outcome.variantsUpdated ?? 0) + 1;
+          variantId = existingId;
+        } else {
+          const result = await variantApi.create({ ...variant.payload, ProductId: productId });
+          if (!result.itemId) throw new Error(result.message ?? "Variant created with no itemId returned");
+          outcome.variantsCreated = (outcome.variantsCreated ?? 0) + 1;
+          variantId = result.itemId;
+        }
+      } catch (error) {
+        outcome.failed.push({
+          line: row.line,
+          message: `variant ${variant.sku}: ${error instanceof Error ? error.message : String(error)}`,
+        });
+        continue;
+      }
+
+      if (variant.stock.length === 0) continue;
+
+      // Existing stock rows for this variant, if it's one that already existed — a brand
+      // new variant's id was just generated, so it cannot already have a balance row.
+      let existingStockByWarehouse = new Map<string, string>();
+      if (existingVariantIdBySku.get(variant.sku) === variantId) {
+        const existingStock = await stockApi.list({ where: { VariantId: { eq: variantId } }, pageSize: 200 });
+        existingStockByWarehouse = new Map(
+          existingStock.items
+            .map((s) => [s.WarehouseId as string | undefined, (s.ItemId ?? s.itemId) as string | undefined] as const)
+            .filter((pair): pair is [string, string] => Boolean(pair[0] && pair[1]))
+        );
+      }
+
+      for (const stock of variant.stock) {
+        const warehouseId = warehouseIdByCode.get(stock.warehouseCode);
+        if (!warehouseId) {
+          outcome.failed.push({ line: row.line, message: `variant ${variant.sku}: unknown WarehouseCode "${stock.warehouseCode}"` });
+          continue;
+        }
+        const stockPayload = {
+          WarehouseId: warehouseId,
+          ProductId: productId,
+          VariantId: variantId,
+          Sku: variant.sku,
+          Quantity: stock.quantity,
+          AvailableToSell: computeAvailableToSell(stock.quantity),
+          ReorderPoint: stock.reorderPoint,
+          ReorderQuantity: stock.reorderQuantity,
+        };
+        try {
+          const existingStockId = existingStockByWarehouse.get(warehouseId);
+          if (existingStockId) {
+            await stockApi.update(existingStockId, stockPayload);
+          } else {
+            await stockApi.create({ ...stockPayload, Version: 1 });
+          }
+          outcome.stockWritten = (outcome.stockWritten ?? 0) + 1;
+        } catch (error) {
+          outcome.failed.push({
+            line: row.line,
+            message: `variant ${variant.sku} stock at "${stock.warehouseCode}": ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
+      }
     }
   }
 

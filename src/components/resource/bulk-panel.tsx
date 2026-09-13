@@ -71,8 +71,13 @@ export function BulkPanel({
     try {
       const result = await applyRows(meta, valid);
       setOutcome(result);
+      const variantNote =
+        result.variantsCreated || result.variantsUpdated
+          ? ` (${result.variantsCreated ?? 0} variant${result.variantsCreated === 1 ? "" : "s"} created, ` +
+            `${result.variantsUpdated ?? 0} updated, ${result.stockWritten ?? 0} stock row${result.stockWritten === 1 ? "" : "s"} written)`
+          : "";
       if (result.failed.length === 0) {
-        toast.success(`Imported ${result.created} new and ${result.updated} updated.`);
+        toast.success(`Imported ${result.created} new and ${result.updated} updated.${variantNote}`);
         onDone();
       } else {
         toast.error(`${result.failed.length} row(s) failed — see below.`);
@@ -92,6 +97,14 @@ export function BulkPanel({
           (pricing, media, addresses) as JSON in a single cell so they survive the round trip;
           JSON writes them as real nested objects/arrays instead — pick whichever the next step
           (a spreadsheet, or a script) actually wants.
+          {meta.schemaName === "Product" && (
+            <>
+              {" "}A product's <code className="text-ink">Variants</code> column carries its full
+              variant list, each with an optional <code className="text-ink">Stock</code> array
+              (per-warehouse quantities, by <code className="text-ink">WarehouseCode</code>) — so
+              re-importing this file recreates or updates those too, not just the product itself.
+            </>
+          )}
         </p>
         <div className="mt-3 flex gap-2">
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void handleExport("csv")}>
@@ -111,6 +124,17 @@ export function BulkPanel({
           record; rows without one create a new record.{" "}
           <strong className="text-ink">Empty (or, in JSON, <code className="text-ink">null</code>) fields are left
           alone, not cleared</strong> — so a partly-filled file won't wipe fields you didn't touch.
+          {meta.schemaName === "Product" && (
+            <>
+              {" "}A row's <code className="text-ink">Variants</code> column, when present, is
+              applied right after that product: each variant is matched to an existing one by{" "}
+              <code className="text-ink">Sku</code> (updated) or created new, and each variant's{" "}
+              <code className="text-ink">Stock</code> entries are matched by warehouse (updated) or
+              created — so providing complete product info, including stock, is optional but
+              supported. A <code className="text-ink">WarehouseCode</code> that doesn't match an
+              existing warehouse fails just that stock entry, not the whole row.
+            </>
+          )}
         </p>
 
         <input
@@ -165,6 +189,11 @@ export function BulkPanel({
           <div className="mt-4 rounded-md border border-hairline p-3 text-xs">
             <p className="text-ink">
               {outcome.created} created · {outcome.updated} updated
+              {(outcome.variantsCreated || outcome.variantsUpdated) ? (
+                <> · {outcome.variantsCreated ?? 0} variant{(outcome.variantsCreated ?? 0) === 1 ? "" : "s"} created ·{" "}
+                  {outcome.variantsUpdated ?? 0} variant{(outcome.variantsUpdated ?? 0) === 1 ? "" : "s"} updated ·{" "}
+                  {outcome.stockWritten ?? 0} stock row{(outcome.stockWritten ?? 0) === 1 ? "" : "s"} written</>
+              ) : null}
               {outcome.failed.length > 0 && <span className="text-brand-error"> · {outcome.failed.length} failed</span>}
             </p>
             {/* Named per line, because there's no transaction: rows before the failure are
