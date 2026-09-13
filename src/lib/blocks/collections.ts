@@ -203,3 +203,80 @@ ${selection}
       ).then((res) => unwrapMutation(res, deleteField)),
   };
 }
+
+export interface BatchListRequest {
+  /** Caller-chosen key the result comes back under — need not be a valid GraphQL name. */
+  key: string;
+  schemaName: string;
+  params?: EntityListParams;
+}
+
+/**
+ * Combines N independent list reads (different schemas, or the same schema with
+ * different `where`/`paging`) into ONE GraphQL request via aliased root fields —
+ * `f0: getBrands(...) { ... } f1: getCategorys(...) { ... }` — instead of N separate
+ * round trips to `/data/v4/gateway`. GraphQL has no restriction on how many root
+ * fields one query selects, or on reusing variable *names* across aliases (each alias
+ * gets its own `$where_f0`/`$paging_f0` pair), so this is exactly the request the
+ * gateway would receive if a caller wrote the combined query by hand — see
+ * BLOCKS_FEATURE_SUGGESTIONS.md-adjacent guidance: batch independent reads (and,
+ * the same way, independent mutations) into one request rather than firing them
+ * one at a time.
+ *
+ * Only ever combines requests that don't depend on each other's result — a request
+ * needing another's output (e.g. "variants of this product" once the product id is
+ * known) still has to wait for that response and stays a separate call.
+ */
+export function buildBatchListQuery(requests: BatchListRequest[]): { query: string; variables: Record<string, unknown> } {
+  const varDecls: string[] = [];
+  const fields: string[] = [];
+  const variables: Record<string, unknown> = {};
+
+  requests.forEach((req, index) => {
+    const alias = `f${index}`;
+    const meta = getEntityMeta(req.schemaName);
+    const listField = `get${req.schemaName}s`;
+    const selection = buildSelection(meta);
+    const whereVar = `${alias}_where`;
+    const pagingVar = `${alias}_paging`;
+
+    varDecls.push(`$${whereVar}: ${req.schemaName}FilterInput`, `$${pagingVar}: PaginationInput`);
+    fields.push(`  ${alias}: ${listField}(where: $${whereVar}, paging: $${pagingVar}) {
+    items {
+${selection}
+    }
+    totalCount
+    pageNo
+    pageSize
+    totalPages
+    hasNextPage
+    hasPreviousPage
+  }`);
+    variables[whereVar] = req.params?.where;
+    variables[pagingVar] = { pageNo: req.params?.pageNo ?? 1, pageSize: req.params?.pageSize ?? 20 };
+  });
+
+  const query = `query BatchList(${varDecls.join(", ")}) {
+${fields.join("\n")}
+}`;
+  return { query, variables };
+}
+
+/** Runs `buildBatchListQuery` and unwraps each alias back to the caller's own `key`. */
+export function runBatchList(requests: BatchListRequest[]): Promise<Record<string, ListResult>> {
+  if (requests.length === 0) return Promise.resolve({});
+
+  const { query, variables } = buildBatchListQuery(requests);
+  return blocksDataCall(() =>
+    blocksClient.data.graphql({ operationName: "BatchList", query, variables })
+  ).then((response) => {
+    const root = response as Record<string, unknown> | undefined;
+    const dataObj = (root?.data ?? root) as Record<string, unknown> | undefined;
+    const result: Record<string, ListResult> = {};
+    requests.forEach((req, index) => {
+      const value = dataObj?.[`f${index}`] as { items?: EntityRecord[]; totalCount?: number } | undefined;
+      result[req.key] = { items: value?.items ?? [], totalCount: value?.totalCount ?? 0 };
+    });
+    return result;
+  });
+}

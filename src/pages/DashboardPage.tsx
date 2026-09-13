@@ -1,5 +1,5 @@
 import { Boxes, Building2, ClipboardList, FolderTree, Package, PackageCheck, Tag, Truck, Warehouse as WarehouseIcon } from "lucide-react";
-import { useEntityList } from "@/lib/blocks/hooks";
+import { useEntityListBatch } from "@/lib/blocks/hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { SummaryCard } from "@/components/dashboard/summary-card";
 import { LowStockPanel } from "@/components/dashboard/low-stock-panel";
@@ -9,9 +9,40 @@ import { LowStockPanel } from "@/components/dashboard/low-stock-panel";
 const IN_PROGRESS_TRANSFER_STATUSES = ["draft", "approved", "in_transit", "partially_received"];
 const OPEN_PURCHASE_ORDER_STATUSES = ["draft", "submitted", "approved", "partially_received"];
 
-function useCount(schemaName: string, where?: Record<string, unknown>) {
-  const query = useEntityList(schemaName, { pageSize: 1, where });
-  return { value: query.data?.totalCount, loading: query.isLoading };
+/**
+ * Every card's count is a `pageSize: 1` list call read for its `totalCount` — cheap,
+ * but 8 of them fired one at a time was 8 separate round trips to the Data Gateway for
+ * a page that's nothing but summary numbers. Batched into one request via
+ * `useEntityListBatch` (see `collections.ts`'s `runBatchList`): each card is still its
+ * own independent `getXs(where:, paging:{pageSize:1})` selection, they're just aliased
+ * together on one GraphQL document instead of eight.
+ */
+function useCounts() {
+  const batch = useEntityListBatch([
+    { key: "totalProducts", schemaName: "Product" },
+    { key: "activeProducts", schemaName: "Product", params: { where: { Status: { eq: "active" } } } },
+    { key: "warehouses", schemaName: "Warehouse" },
+    { key: "categories", schemaName: "Category" },
+    { key: "brands", schemaName: "Brand" },
+    { key: "suppliers", schemaName: "Supplier" },
+    { key: "inProgressTransfers", schemaName: "StockTransfer", params: { where: { Status: { in: IN_PROGRESS_TRANSFER_STATUSES } } } },
+    { key: "openPurchaseOrders", schemaName: "PurchaseOrder", params: { where: { Status: { in: OPEN_PURCHASE_ORDER_STATUSES } } } },
+  ].map((req) => ({ ...req, params: { ...req.params, pageSize: 1 } })));
+
+  function count(key: string) {
+    return { value: batch.data?.[key]?.totalCount, loading: batch.isLoading };
+  }
+
+  return {
+    totalProducts: count("totalProducts"),
+    activeProducts: count("activeProducts"),
+    warehouses: count("warehouses"),
+    categories: count("categories"),
+    brands: count("brands"),
+    suppliers: count("suppliers"),
+    inProgressTransfers: count("inProgressTransfers"),
+    openPurchaseOrders: count("openPurchaseOrders"),
+  };
 }
 
 /**
@@ -25,14 +56,8 @@ function useCount(schemaName: string, where?: Record<string, unknown>) {
  * that's available server-side.
  */
 export default function DashboardPage() {
-  const totalProducts = useCount("Product");
-  const activeProducts = useCount("Product", { Status: { eq: "active" } });
-  const warehouses = useCount("Warehouse");
-  const categories = useCount("Category");
-  const brands = useCount("Brand");
-  const suppliers = useCount("Supplier");
-  const inProgressTransfers = useCount("StockTransfer", { Status: { in: IN_PROGRESS_TRANSFER_STATUSES } });
-  const openPurchaseOrders = useCount("PurchaseOrder", { Status: { in: OPEN_PURCHASE_ORDER_STATUSES } });
+  const { totalProducts, activeProducts, warehouses, categories, brands, suppliers, inProgressTransfers, openPurchaseOrders } =
+    useCounts();
 
   return (
     <div className="pb-2 pt-1">

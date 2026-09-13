@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Boxes, ClipboardList, Mail, MapPin, Package, Phone, Plus, Truck } from "lucide-react";
-import { useEntityList, useEntityMutations } from "@/lib/blocks/hooks";
+import { useEntityListBatch, useEntityMutations } from "@/lib/blocks/hooks";
 import { getEntityMeta, type EntityRecord } from "@/lib/blocks/collections";
 import { useReferenceLabels } from "@/lib/blocks/use-reference-labels";
 import { PageHeader } from "@/components/ui/page-header";
@@ -32,11 +32,6 @@ const PAGE_SIZE = 20;
 // "pending"/"open" aren't literal status strings, so these approximate "not yet finished".
 const IN_PROGRESS_TRANSFER_STATUSES = ["draft", "approved", "in_transit", "partially_received"];
 const OPEN_PURCHASE_ORDER_STATUSES = ["draft", "submitted", "approved", "partially_received"];
-
-function useScopedCount(schemaName: string, where: Record<string, unknown>, enabled: boolean) {
-  const query = useEntityList(schemaName, { pageSize: 1, where }, enabled);
-  return { value: query.data?.totalCount, loading: query.isLoading };
-}
 
 const warehouseMeta = getEntityMeta("Warehouse");
 const inventoryMeta = getEntityMeta("WarehouseInventory");
@@ -69,16 +64,11 @@ export default function WarehouseDetailPage() {
   const isAdmin = useHasRole("admin");
   const { user } = useAuth();
 
-  const warehouseQuery = useEntityList("Warehouse", { where: { ItemId: { eq: warehouseId } }, pageSize: 1 }, hasId);
-  const warehouse = warehouseQuery.data?.items[0];
   const warehouseMutations = useEntityMutations("Warehouse");
+  const inventoryMutations = useEntityMutations("WarehouseInventory");
+  const transferMutations = useEntityMutations("StockTransfer");
 
   const inventoryWhere = useMemo(() => (warehouseId ? { WarehouseId: { eq: warehouseId } } : undefined), [warehouseId]);
-  const inventoryList = useEntityList("WarehouseInventory", { pageNo, pageSize: PAGE_SIZE, where: inventoryWhere }, hasId);
-  const inventoryMutations = useEntityMutations("WarehouseInventory");
-  const inventoryItems = inventoryList.data?.items ?? [];
-  const { referenceLabels } = useReferenceLabels(inventoryMeta, inventoryItems);
-
   const transferWhere = useMemo(
     () =>
       warehouseId
@@ -86,26 +76,65 @@ export default function WarehouseDetailPage() {
         : undefined,
     [warehouseId]
   );
-  const transferList = useEntityList("StockTransfer", { pageNo: transferPageNo, pageSize: PAGE_SIZE, where: transferWhere }, hasId);
-  const transferMutations = useEntityMutations("StockTransfer");
-  const transferItems = transferList.data?.items ?? [];
+
+  // The warehouse record, its two paginated tables, and four scoped counts are all
+  // independent reads (none needs another's result) — one combined request instead of
+  // 7 separate round trips. See `useEntityListBatch` / `collections.ts`'s `runBatchList`.
+  const batch = useEntityListBatch([
+    { key: "warehouse", schemaName: "Warehouse", params: { where: { ItemId: { eq: warehouseId } }, pageSize: 1 }, enabled: hasId },
+    { key: "inventoryList", schemaName: "WarehouseInventory", params: { pageNo, pageSize: PAGE_SIZE, where: inventoryWhere }, enabled: hasId },
+    { key: "transferList", schemaName: "StockTransfer", params: { pageNo: transferPageNo, pageSize: PAGE_SIZE, where: transferWhere }, enabled: hasId },
+    { key: "inventoryCount", schemaName: "WarehouseInventory", params: { pageSize: 1, where: { WarehouseId: { eq: warehouseId } } }, enabled: hasId },
+    {
+      key: "transferCount",
+      schemaName: "StockTransfer",
+      params: {
+        pageSize: 1,
+        where: {
+          Status: { in: IN_PROGRESS_TRANSFER_STATUSES },
+          or: [{ SourceWarehouseId: { eq: warehouseId } }, { DestinationWarehouseId: { eq: warehouseId } }],
+        },
+      },
+      enabled: hasId,
+    },
+    {
+      key: "purchaseOrderCount",
+      schemaName: "PurchaseOrder",
+      params: { pageSize: 1, where: { WarehouseId: { eq: warehouseId }, Status: { in: OPEN_PURCHASE_ORDER_STATUSES } } },
+      enabled: hasId,
+    },
+    { key: "movementCount", schemaName: "InventoryMovement", params: { pageSize: 1, where: { WarehouseId: { eq: warehouseId } } }, enabled: hasId },
+  ]);
+
+  // `isError`/`error`/`refetch` are the combined batch's — one failed sub-request fails
+  // the whole request, and retrying refetches the whole page's data, not just one table.
+  const warehouseQuery = { isLoading: batch.isLoading, data: batch.data?.warehouse };
+  const warehouse = batch.data?.warehouse?.items[0];
+
+  const inventoryList = {
+    isLoading: batch.isLoading,
+    isError: batch.isError,
+    error: batch.error,
+    data: batch.data?.inventoryList,
+    refetch: batch.refetch,
+  };
+  const inventoryItems = batch.data?.inventoryList?.items ?? [];
+  const { referenceLabels } = useReferenceLabels(inventoryMeta, inventoryItems);
+
+  const transferList = {
+    isLoading: batch.isLoading,
+    isError: batch.isError,
+    error: batch.error,
+    data: batch.data?.transferList,
+    refetch: batch.refetch,
+  };
+  const transferItems = batch.data?.transferList?.items ?? [];
   const { referenceLabels: transferReferenceLabels } = useReferenceLabels(transferMeta, transferItems);
 
-  const inventoryCount = useScopedCount("WarehouseInventory", { WarehouseId: { eq: warehouseId } }, hasId);
-  const transferCount = useScopedCount(
-    "StockTransfer",
-    {
-      Status: { in: IN_PROGRESS_TRANSFER_STATUSES },
-      or: [{ SourceWarehouseId: { eq: warehouseId } }, { DestinationWarehouseId: { eq: warehouseId } }],
-    },
-    hasId
-  );
-  const purchaseOrderCount = useScopedCount(
-    "PurchaseOrder",
-    { WarehouseId: { eq: warehouseId }, Status: { in: OPEN_PURCHASE_ORDER_STATUSES } },
-    hasId
-  );
-  const movementCount = useScopedCount("InventoryMovement", { WarehouseId: { eq: warehouseId } }, hasId);
+  const inventoryCount = { value: batch.data?.inventoryCount?.totalCount, loading: batch.isLoading };
+  const transferCount = { value: batch.data?.transferCount?.totalCount, loading: batch.isLoading };
+  const purchaseOrderCount = { value: batch.data?.purchaseOrderCount?.totalCount, loading: batch.isLoading };
+  const movementCount = { value: batch.data?.movementCount?.totalCount, loading: batch.isLoading };
 
   if (!warehouseId) return <Navigate to="/admin/warehouse" replace />;
 

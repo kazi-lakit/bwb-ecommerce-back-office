@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { useEntityList } from "./hooks";
+import { useEntityListBatch } from "./hooks";
 import { entityLabel } from "@/lib/format";
 import { REFERENCE_FIELD_TARGETS } from "./reference-fields";
 import type { EntityMeta } from "./schema-meta";
 import type { EntityRecord } from "./collections";
+
+/** Every possible reference target, in a fixed order so the batch's shape stays stable. */
+const REFERENCE_TARGET_SCHEMAS = ["Brand", "Category", "Warehouse", "Product", "ProductVariant", "Supplier"] as const;
 
 /**
  * Resolves every reference field (WarehouseId, ProductId, VariantId, BrandId,
@@ -40,24 +43,21 @@ export function useReferenceLabels(meta: EntityMeta | undefined, items: EntityRe
     return Array.from(neededIdsByTarget[target] ?? []);
   }
 
-  function lookupParams(target: string) {
-    const ids = idsFor(target);
-    return { params: { pageSize: 200, where: ids.length > 0 ? { ItemId: { in: ids } } : undefined }, enabled: ids.length > 0 };
-  }
-
-  const brandLookup = lookupParams("Brand");
-  const categoryLookup = lookupParams("Category");
-  const warehouseLookup = lookupParams("Warehouse");
-  const productLookup = lookupParams("Product");
-  const variantLookup = lookupParams("ProductVariant");
-  const supplierLookup = lookupParams("Supplier");
-
-  const brandsForLookup = useEntityList("Brand", brandLookup.params, brandLookup.enabled);
-  const categoriesForLookup = useEntityList("Category", categoryLookup.params, categoryLookup.enabled);
-  const warehousesForLookup = useEntityList("Warehouse", warehouseLookup.params, warehouseLookup.enabled);
-  const productsForLookup = useEntityList("Product", productLookup.params, productLookup.enabled);
-  const variantsForLookup = useEntityList("ProductVariant", variantLookup.params, variantLookup.enabled);
-  const suppliersForLookup = useEntityList("Supplier", supplierLookup.params, supplierLookup.enabled);
+  // One combined request instead of up to 6 separate ones — see `useEntityListBatch`.
+  // Every target schema is still its own aliased root field on the wire (still exactly
+  // the ids each target actually needs, via `where: {ItemId: {in: [...]}}`), just sent
+  // together rather than as N round trips.
+  const batch = useEntityListBatch(
+    REFERENCE_TARGET_SCHEMAS.map((schemaName) => {
+      const ids = idsFor(schemaName);
+      return {
+        key: schemaName,
+        schemaName,
+        params: { pageSize: 200, where: ids.length > 0 ? { ItemId: { in: ids } } : undefined },
+        enabled: ids.length > 0,
+      };
+    })
+  );
 
   const lookupsBySchema = useMemo(() => {
     function nameMap(records: EntityRecord[]): Record<string, string> {
@@ -68,22 +68,12 @@ export function useReferenceLabels(meta: EntityMeta | undefined, items: EntityRe
       }
       return byId;
     }
-    return {
-      Brand: nameMap(brandsForLookup.data?.items ?? []),
-      Category: nameMap(categoriesForLookup.data?.items ?? []),
-      Warehouse: nameMap(warehousesForLookup.data?.items ?? []),
-      Product: nameMap(productsForLookup.data?.items ?? []),
-      ProductVariant: nameMap(variantsForLookup.data?.items ?? []),
-      Supplier: nameMap(suppliersForLookup.data?.items ?? []),
-    } as Record<string, Record<string, string>>;
-  }, [
-    brandsForLookup.data,
-    categoriesForLookup.data,
-    warehousesForLookup.data,
-    productsForLookup.data,
-    variantsForLookup.data,
-    suppliersForLookup.data,
-  ]);
+    const result: Record<string, Record<string, string>> = {};
+    for (const schemaName of REFERENCE_TARGET_SCHEMAS) {
+      result[schemaName] = nameMap(batch.data?.[schemaName]?.items ?? []);
+    }
+    return result;
+  }, [batch.data]);
 
   const referenceLabels = useMemo(() => {
     const result: Record<string, Record<string, string>> = {};
