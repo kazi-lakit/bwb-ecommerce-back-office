@@ -11,7 +11,15 @@ export const store: {
   failReservationInsert: boolean;
   onReservationUpdate?: () => void;
   orders: Record<string, unknown>[];
-} = { rows: [], movements: [], casResultOverride: [], failMovement: false, rejectUnknownBuckets: false, denyWrites: false, reservations: [], failReservationInsert: false, orders: [] };
+  products: Record<string, unknown>[];
+  variants: Record<string, unknown>[];
+  warehouses: Record<string, unknown>[];
+  nextId: number;
+  failInsertManyFor: string | null;        // schemaName whose next insertMany should error, atomically
+} = {
+  rows: [], movements: [], casResultOverride: [], failMovement: false, rejectUnknownBuckets: false, denyWrites: false,
+  reservations: [], failReservationInsert: false, orders: [], products: [], variants: [], warehouses: [], nextId: 1, failInsertManyFor: null,
+};
 
 export function reset(rows: Row[]) {
   store.rows = JSON.parse(JSON.stringify(rows));
@@ -19,6 +27,33 @@ export function reset(rows: Row[]) {
   store.failMovement = false; store.denyWrites = false; store.onCas = undefined;
   store.reservations = []; store.failReservationInsert = false; store.onReservationUpdate = undefined;
   store.orders = [];
+  store.products = []; store.variants = []; store.warehouses = [];
+  store.nextId = 1; store.failInsertManyFor = null;
+}
+
+function nextId(): string {
+  return `fake${store.nextId++}`;
+}
+
+/** Same operator subset the real gateway's `where` clauses use — `eq`/`in`, matched per field. */
+function matchesWhere(where: Record<string, unknown> | undefined, row: Record<string, unknown>): boolean {
+  if (!where) return true;
+  return Object.entries(where).every(([field, cond]) => {
+    if (!cond || typeof cond !== "object") return true;
+    if ("eq" in cond) return row[field] === (cond as { eq: unknown }).eq;
+    if ("in" in cond) return ((cond as { in: unknown[] }).in).includes(row[field]);
+    return true;
+  });
+}
+
+function collectionFor(schemaName: string): Record<string, unknown>[] {
+  switch (schemaName) {
+    case "Product": return store.products;
+    case "ProductVariant": return store.variants;
+    case "Warehouse": return store.warehouses;
+    case "WarehouseInventory": return store.rows as unknown as Record<string, unknown>[];
+    default: throw new Error(`fake-client: no collection wired for schema ${schemaName}`);
+  }
 }
 
 const NEW_BUCKETS = ["Blocked", "Backordered", "InTransit"];
@@ -28,6 +63,48 @@ export const blocksClient = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async graphql(req: any): Promise<any> {
       const { operationName, query, variables } = req;
+
+      if (operationName === "getProducts" || operationName === "getProductVariants" || operationName === "getWarehouses") {
+        const schemaName = operationName === "getProducts" ? "Product" : operationName === "getProductVariants" ? "ProductVariant" : "Warehouse";
+        const items = collectionFor(schemaName).filter((r) => matchesWhere(variables.where, r));
+        return { data: { [operationName]: { items, totalCount: items.length } } };
+      }
+
+      if (operationName?.startsWith("insertMany")) {
+        const schemaName = operationName.slice("insertMany".length);
+        if (store.failInsertManyFor === schemaName) {
+          store.failInsertManyFor = null; // one-shot, like a real validation error would only hit once
+          return { errors: [{ message: `A record with the same value already exists.` }], data: { [operationName]: null } };
+        }
+        const collection = collectionFor(schemaName);
+        const itemIds: string[] = [];
+        for (const input of variables.input as Record<string, unknown>[]) {
+          const id = nextId();
+          collection.push({ ItemId: id, ...input });
+          itemIds.push(id);
+        }
+        return { data: { [operationName]: { acknowledged: true, itemIds, message: null, totalImpactedData: itemIds.length } } };
+      }
+
+      if (operationName === "BatchUpdate") {
+        const aliasSchema: Record<string, string> = {};
+        const re = /(\w+): update(\w+)\(/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(query))) aliasSchema[m[1]] = m[2];
+        const result: Record<string, unknown> = {};
+        for (const [alias, schemaName] of Object.entries(aliasSchema)) {
+          const itemId = (variables[`${alias}_where`] as { ItemId?: { eq?: string } } | undefined)?.ItemId?.eq;
+          const input = variables[`${alias}_input`] as Record<string, unknown>;
+          const row = collectionFor(schemaName).find((r) => r.ItemId === itemId);
+          if (!row) {
+            result[alias] = { acknowledged: false, itemId: null, message: "No data found to UPDATE or you don't have permission to UPDATE this record.", totalImpactedData: 0 };
+            continue;
+          }
+          Object.assign(row, input);
+          result[alias] = { acknowledged: true, itemId: row.ItemId, message: null, totalImpactedData: 1 };
+        }
+        return { data: result };
+      }
 
       if (operationName === "getWarehouseInventorys") {
         if (store.rejectUnknownBuckets && NEW_BUCKETS.some((b) => query.includes(b))) {

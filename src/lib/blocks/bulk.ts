@@ -1,4 +1,4 @@
-import { createEntityApi, getEntityMeta, runBatchList, type EntityListParams } from "./collections";
+import { createEntityApi, getEntityMeta, runBatchList, runBatchUpdate, type EntityListParams } from "./collections";
 import { isComplexFieldType, type EntityMeta } from "./schema-meta";
 import { toCsv, parseCsv, type ParsedCsv } from "@/lib/csv";
 
@@ -15,6 +15,16 @@ const SYSTEM_COLUMNS = ["ItemId", "CreatedDate", "LastUpdatedDate", "CreatedBy",
 /** A ceiling on one export, so a mistaken click can't try to pull an unbounded collection. */
 const MAX_EXPORT_ROWS = 5000;
 const EXPORT_PAGE_SIZE = 200;
+/** Batched creates (`insertMany`) and batched updates (aliased mutations) are each split into
+ * chunks this large, so one import of thousands of rows doesn't try to send them all as a
+ * single oversized request. */
+const BATCH_WRITE_SIZE = 50;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
 
 /** Product's real fields, plus one synthetic column carrying its variants (and each
  * variant's optional per-warehouse stock) — see `VARIANT_FIELDS`/`applyRows` below. Not a
@@ -507,12 +517,20 @@ export interface ImportOutcome {
 }
 
 /**
- * Applies the rows, one write at a time.
+ * Applies the rows in batches, not one write at a time — new rows go in via `insertMany`
+ * (one native bulk-insert mutation), and rows carrying an `ItemId` (an update) go in via
+ * `runBatchUpdate` (N `update<Schema>` mutations aliased into one GraphQL request, since
+ * there's no `insertMany`-equivalent for "N rows, N different payloads"). Both are chunked
+ * at `BATCH_WRITE_SIZE` so one big import doesn't become one oversized request.
  *
- * There is no batch mutation and no transaction, so a failure partway leaves earlier rows
- * applied. That's reported per line rather than hidden behind a single "import failed" —
- * knowing row 34 is the one that broke, and that 1–33 landed, is the difference between
- * fixing a cell and re-importing blind.
+ * The two batching primitives fail differently, and `ImportOutcome` reflects that instead of
+ * hiding it: `insertMany` is atomic server-side (one bad row fails every row in that chunk,
+ * confirmed live — see `createEntityApi.createMany`'s doc), so a create failure is reported
+ * against every row in the chunk it broke, not pinpointed to the one that actually caused it.
+ * An aliased update batch resolves each row independently (confirmed: GraphQL only throws
+ * away the HTTP layer on a non-2xx status, so one row's business failure just leaves that
+ * alias's data `null`, not the others'), so update failures keep the original per-line
+ * precision.
  *
  * `Product` rows get one extra pass — see `applyProductRows` — since a product's variants
  * (and each variant's optional per-warehouse stock) don't exist as their own import rows;
@@ -533,29 +551,29 @@ export async function applyRows(meta: EntityMeta, rows: RowResult[]): Promise<Im
     else createRows.push(row);
   }
 
-  // Updates carry a different payload per row, so there's no single-call primitive for them —
-  // apply one at a time, same as before.
-  for (const row of updateRows) {
+  for (const batch of chunk(updateRows, BATCH_WRITE_SIZE)) {
     try {
-      await api.update(row.itemId!, row.payload);
-      outcome.updated += 1;
+      const results = await runBatchUpdate(
+        batch.map((row, i) => ({ key: String(i), schemaName: meta.schemaName, itemId: row.itemId!, payload: row.payload }))
+      );
+      batch.forEach((row, i) => {
+        const result = results[String(i)];
+        if (result?.totalImpactedData) outcome.updated += 1;
+        else outcome.failed.push({ line: row.line, message: result?.message || "No record matched this ItemId." });
+      });
     } catch (error) {
-      outcome.failed.push({ line: row.line, message: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      for (const row of batch) outcome.failed.push({ line: row.line, message });
     }
   }
 
-  // New rows have no cross-row dependency, so they go in as one `insertMany` mutation
-  // instead of N round trips. It's all-or-nothing server-side (one bad row, e.g. a
-  // duplicate unique field, fails every row in the batch, confirmed live) — so a failure
-  // here is reported against every create-row together, not pinpointed to the one that
-  // actually caused it; the mutation's own error message is the best lead for which field.
-  if (createRows.length > 0) {
+  for (const batch of chunk(createRows, BATCH_WRITE_SIZE)) {
     try {
-      const result = await api.createMany(createRows.map((row) => row.payload));
-      outcome.created += result.itemIds?.length ?? createRows.length;
+      const result = await api.createMany(batch.map((row) => row.payload));
+      outcome.created += result.itemIds?.length ?? batch.length;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      for (const row of createRows) outcome.failed.push({ line: row.line, message });
+      for (const row of batch) outcome.failed.push({ line: row.line, message });
     }
   }
 
@@ -574,22 +592,55 @@ function computeAvailableToSell(quantity: ImportedStockEntry["quantity"]): numbe
   );
 }
 
+/** One variant entry paired with the row it came from and (once known) its parent product's
+ * real id — the unit `applyProductRows` batches variant writes over. */
+interface FlatVariant {
+  row: RowResult;
+  variant: ImportedVariant;
+  productId: string;
+}
+
+/** One stock entry paired with the flattened variant it belongs to and (once resolved) real
+ * `WarehouseId` — the unit `applyProductRows` batches stock writes over. */
+interface FlatStock {
+  flatVariant: FlatVariant;
+  stock: ImportedStockEntry;
+  variantId: string;
+  warehouseId: string;
+}
+
+function stockMutationPayload(entry: FlatStock): Record<string, unknown> {
+  return {
+    WarehouseId: entry.warehouseId,
+    ProductId: entry.flatVariant.productId,
+    VariantId: entry.variantId,
+    Sku: entry.flatVariant.variant.sku,
+    Quantity: entry.stock.quantity,
+    AvailableToSell: computeAvailableToSell(entry.stock.quantity),
+    ReorderPoint: entry.stock.reorderPoint,
+    ReorderQuantity: entry.stock.reorderQuantity,
+  };
+}
+
 /**
- * The Product-specific import path: create/update the product itself, then for each of its
- * `Variants` entries create/update a `ProductVariant`, then for each variant's `Stock`
- * entries create/update a `WarehouseInventory` row. All three are separate schemas/
- * collections with no batch-mutation or transaction between them (same platform limit the
- * module doc above already lives with) — a failure partway through one product's variants
- * still leaves the product and any already-applied variants/stock in place, reported
- * per-line rather than losing that context behind one failure message.
+ * The Product-specific import path: create/update every Product, then — once each has a real
+ * id — create/update every one of their `Variants` entries, then — once each of *those* has a
+ * real id — create/update every `Stock` entry. Each of the three levels is applied in
+ * `BATCH_WRITE_SIZE` chunks via `insertMany`/`runBatchUpdate` (see `applyRows`'s doc for how
+ * those two batching primitives differ), rather than one write per row/variant/stock entry —
+ * a product with 50 variants each carrying stock at 3 warehouses used to be ~150 sequential
+ * writes; it's now a handful of batched requests. A write's own failure only ever removes
+ * that one row from the *next* level's input (a product that failed to create never reaches
+ * the variant stage at all) — everything else in the same chunk, and every other chunk, still
+ * goes through, reported per-line rather than losing that context behind one failure message.
  *
  * Re-importing a previous export must not duplicate what's already there: a variant is
- * matched to an existing one by `Sku` (its natural key — the import file has no way to
- * carry a variant's own `ItemId` the way a product row carries its own), and a stock row is
- * matched by the `(VariantId, WarehouseId)` pair `WarehouseDetailPage`'s own admin screens
- * treat as that natural key — see `BLOCKS_FEATURE_SUGGESTIONS.md`'s note that nothing
- * enforces it as a real constraint yet, which is exactly why this checks first rather than
- * trusting a blind create not to produce a second, conflicting balance row.
+ * matched to an existing one by `Sku` (its natural key — the import file has no way to carry
+ * a variant's own `ItemId` the way a product row carries its own), and a stock row is matched
+ * by the `(VariantId, WarehouseId)` pair `WarehouseDetailPage`'s own admin screens treat as
+ * that natural key — see `BLOCKS_FEATURE_SUGGESTIONS.md`'s note that nothing enforces it as a
+ * real constraint yet, which is exactly why this checks first rather than trusting a blind
+ * create not to produce a second, conflicting balance row.
  */
 async function applyProductRows(rows: RowResult[]): Promise<ImportOutcome> {
   const productApi = createEntityApi("Product");
@@ -633,90 +684,185 @@ async function applyProductRows(rows: RowResult[]): Promise<ImportOutcome> {
     }
   }
 
-  for (const row of okRows) {
-    let productId: string;
-    try {
-      if (row.itemId) {
-        await productApi.update(row.itemId, row.payload);
-        outcome.updated += 1;
-        productId = row.itemId;
-      } else {
-        const result = await productApi.create(row.payload);
-        if (!result.itemId) throw new Error(result.message ?? "Product created with no itemId returned");
-        outcome.created += 1;
-        productId = result.itemId;
-      }
-    } catch (error) {
-      outcome.failed.push({ line: row.line, message: error instanceof Error ? error.message : String(error) });
-      continue;
-    }
+  // ---- Products: batch-update the existing ones, batch-create the new ones ----
+  const productIdByRow = new Map<RowResult, string>();
+  const [updateProductRows, createProductRows] = [okRows.filter((r) => r.itemId), okRows.filter((r) => !r.itemId)];
 
-    for (const variant of row.variants ?? []) {
-      let variantId: string;
-      try {
-        const existingId = existingVariantIdBySku.get(variant.sku);
-        if (existingId) {
-          await variantApi.update(existingId, { ...variant.payload, ProductId: productId });
-          outcome.variantsUpdated = (outcome.variantsUpdated ?? 0) + 1;
-          variantId = existingId;
+  for (const batch of chunk(updateProductRows, BATCH_WRITE_SIZE)) {
+    try {
+      const results = await runBatchUpdate(batch.map((row, i) => ({ key: String(i), schemaName: "Product", itemId: row.itemId!, payload: row.payload })));
+      batch.forEach((row, i) => {
+        const result = results[String(i)];
+        if (result?.totalImpactedData) {
+          outcome.updated += 1;
+          productIdByRow.set(row, row.itemId!);
         } else {
-          const result = await variantApi.create({ ...variant.payload, ProductId: productId });
-          if (!result.itemId) throw new Error(result.message ?? "Variant created with no itemId returned");
-          outcome.variantsCreated = (outcome.variantsCreated ?? 0) + 1;
-          variantId = result.itemId;
+          outcome.failed.push({ line: row.line, message: result?.message || "No record matched this ItemId." });
         }
-      } catch (error) {
-        outcome.failed.push({
-          line: row.line,
-          message: `variant ${variant.sku}: ${error instanceof Error ? error.message : String(error)}`,
-        });
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const row of batch) outcome.failed.push({ line: row.line, message });
+    }
+  }
+
+  for (const batch of chunk(createProductRows, BATCH_WRITE_SIZE)) {
+    try {
+      const result = await productApi.createMany(batch.map((row) => row.payload));
+      const itemIds = result.itemIds ?? [];
+      if (itemIds.length !== batch.length) {
+        for (const row of batch) outcome.failed.push({ line: row.line, message: result.message || "insertMany didn't return one id per row." });
         continue;
       }
+      batch.forEach((row, i) => {
+        outcome.created += 1;
+        productIdByRow.set(row, itemIds[i]);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const row of batch) outcome.failed.push({ line: row.line, message });
+    }
+  }
 
-      if (variant.stock.length === 0) continue;
+  // ---- Variants: flatten every row's Variants against its now-real ProductId ----
+  const flatVariants: FlatVariant[] = [];
+  for (const row of okRows) {
+    const productId = productIdByRow.get(row);
+    if (!productId) continue; // this row's product failed above; already reported there
+    for (const variant of row.variants ?? []) flatVariants.push({ row, variant, productId });
+  }
 
-      // Existing stock rows for this variant, if it's one that already existed — a brand
-      // new variant's id was just generated, so it cannot already have a balance row.
-      let existingStockByWarehouse = new Map<string, string>();
-      if (existingVariantIdBySku.get(variant.sku) === variantId) {
-        const existingStock = await stockApi.list({ where: { VariantId: { eq: variantId } }, pageSize: 200 });
-        existingStockByWarehouse = new Map(
-          existingStock.items
-            .map((s) => [s.WarehouseId as string | undefined, (s.ItemId ?? s.itemId) as string | undefined] as const)
-            .filter((pair): pair is [string, string] => Boolean(pair[0] && pair[1]))
-        );
-      }
+  const variantIdByFlat = new Map<FlatVariant, string>();
+  const [updateVariants, createVariants] = [
+    flatVariants.filter((fv) => existingVariantIdBySku.has(fv.variant.sku)),
+    flatVariants.filter((fv) => !existingVariantIdBySku.has(fv.variant.sku)),
+  ];
 
-      for (const stock of variant.stock) {
-        const warehouseId = warehouseIdByCode.get(stock.warehouseCode);
-        if (!warehouseId) {
-          outcome.failed.push({ line: row.line, message: `variant ${variant.sku}: unknown WarehouseCode "${stock.warehouseCode}"` });
-          continue;
+  for (const batch of chunk(updateVariants, BATCH_WRITE_SIZE)) {
+    try {
+      const results = await runBatchUpdate(
+        batch.map((fv, i) => ({
+          key: String(i),
+          schemaName: "ProductVariant",
+          itemId: existingVariantIdBySku.get(fv.variant.sku)!,
+          payload: { ...fv.variant.payload, ProductId: fv.productId },
+        }))
+      );
+      batch.forEach((fv, i) => {
+        const result = results[String(i)];
+        if (result?.totalImpactedData) {
+          outcome.variantsUpdated = (outcome.variantsUpdated ?? 0) + 1;
+          variantIdByFlat.set(fv, existingVariantIdBySku.get(fv.variant.sku)!);
+        } else {
+          outcome.failed.push({ line: fv.row.line, message: `variant ${fv.variant.sku}: ${result?.message || "update failed"}` });
         }
-        const stockPayload = {
-          WarehouseId: warehouseId,
-          ProductId: productId,
-          VariantId: variantId,
-          Sku: variant.sku,
-          Quantity: stock.quantity,
-          AvailableToSell: computeAvailableToSell(stock.quantity),
-          ReorderPoint: stock.reorderPoint,
-          ReorderQuantity: stock.reorderQuantity,
-        };
-        try {
-          const existingStockId = existingStockByWarehouse.get(warehouseId);
-          if (existingStockId) {
-            await stockApi.update(existingStockId, stockPayload);
-          } else {
-            await stockApi.create({ ...stockPayload, Version: 1 });
-          }
-          outcome.stockWritten = (outcome.stockWritten ?? 0) + 1;
-        } catch (error) {
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const fv of batch) outcome.failed.push({ line: fv.row.line, message: `variant ${fv.variant.sku}: ${message}` });
+    }
+  }
+
+  for (const batch of chunk(createVariants, BATCH_WRITE_SIZE)) {
+    try {
+      const result = await variantApi.createMany(batch.map((fv) => ({ ...fv.variant.payload, ProductId: fv.productId })));
+      const itemIds = result.itemIds ?? [];
+      if (itemIds.length !== batch.length) {
+        for (const fv of batch) {
+          outcome.failed.push({ line: fv.row.line, message: `variant ${fv.variant.sku}: ${result.message || "insertMany didn't return one id per row."}` });
+        }
+        continue;
+      }
+      batch.forEach((fv, i) => {
+        outcome.variantsCreated = (outcome.variantsCreated ?? 0) + 1;
+        variantIdByFlat.set(fv, itemIds[i]);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const fv of batch) outcome.failed.push({ line: fv.row.line, message: `variant ${fv.variant.sku}: ${message}` });
+    }
+  }
+
+  // ---- Stock: flatten every surviving variant's Stock against its now-real VariantId ----
+  // Existing balances are only looked up for variants that already existed — a brand new
+  // variant's id was just generated, so it cannot already have a balance row.
+  const existingVariantIds = Array.from(existingVariantIdBySku.values());
+  const existingStockIdByKey = new Map<string, string>(); // `${variantId}:${warehouseId}` -> ItemId
+  if (existingVariantIds.length > 0) {
+    const existingStock = await stockApi.list({ where: { VariantId: { in: existingVariantIds } }, pageSize: MAX_EXPORT_ROWS });
+    for (const s of existingStock.items) {
+      const variantId = s.VariantId as string | undefined;
+      const warehouseId = s.WarehouseId as string | undefined;
+      const id = (s.ItemId ?? s.itemId) as string | undefined;
+      if (variantId && warehouseId && id) existingStockIdByKey.set(`${variantId}:${warehouseId}`, id);
+    }
+  }
+
+  const flatStock: FlatStock[] = [];
+  for (const fv of flatVariants) {
+    const variantId = variantIdByFlat.get(fv);
+    if (!variantId) continue; // this variant failed above; already reported there
+    for (const stock of fv.variant.stock) {
+      const warehouseId = warehouseIdByCode.get(stock.warehouseCode);
+      if (!warehouseId) {
+        outcome.failed.push({ line: fv.row.line, message: `variant ${fv.variant.sku}: unknown WarehouseCode "${stock.warehouseCode}"` });
+        continue;
+      }
+      flatStock.push({ flatVariant: fv, stock, variantId, warehouseId });
+    }
+  }
+
+  const [updateStock, createStock] = [
+    flatStock.filter((fs) => existingStockIdByKey.has(`${fs.variantId}:${fs.warehouseId}`)),
+    flatStock.filter((fs) => !existingStockIdByKey.has(`${fs.variantId}:${fs.warehouseId}`)),
+  ];
+
+  for (const batch of chunk(updateStock, BATCH_WRITE_SIZE)) {
+    try {
+      const results = await runBatchUpdate(
+        batch.map((fs, i) => ({
+          key: String(i),
+          schemaName: "WarehouseInventory",
+          itemId: existingStockIdByKey.get(`${fs.variantId}:${fs.warehouseId}`)!,
+          payload: stockMutationPayload(fs),
+        }))
+      );
+      batch.forEach((fs, i) => {
+        const result = results[String(i)];
+        if (result?.totalImpactedData) outcome.stockWritten = (outcome.stockWritten ?? 0) + 1;
+        else {
           outcome.failed.push({
-            line: row.line,
-            message: `variant ${variant.sku} stock at "${stock.warehouseCode}": ${error instanceof Error ? error.message : String(error)}`,
+            line: fs.flatVariant.row.line,
+            message: `variant ${fs.flatVariant.variant.sku} stock at "${fs.stock.warehouseCode}": ${result?.message || "update failed"}`,
           });
         }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const fs of batch) {
+        outcome.failed.push({ line: fs.flatVariant.row.line, message: `variant ${fs.flatVariant.variant.sku} stock at "${fs.stock.warehouseCode}": ${message}` });
+      }
+    }
+  }
+
+  for (const batch of chunk(createStock, BATCH_WRITE_SIZE)) {
+    try {
+      const result = await stockApi.createMany(batch.map((fs) => ({ ...stockMutationPayload(fs), Version: 1 })));
+      const itemIds = result.itemIds ?? [];
+      if (itemIds.length !== batch.length) {
+        for (const fs of batch) {
+          outcome.failed.push({
+            line: fs.flatVariant.row.line,
+            message: `variant ${fs.flatVariant.variant.sku} stock at "${fs.stock.warehouseCode}": ${result.message || "insertMany didn't return one id per row."}`,
+          });
+        }
+        continue;
+      }
+      outcome.stockWritten = (outcome.stockWritten ?? 0) + batch.length;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const fs of batch) {
+        outcome.failed.push({ line: fs.flatVariant.row.line, message: `variant ${fs.flatVariant.variant.sku} stock at "${fs.stock.warehouseCode}": ${message}` });
       }
     }
   }

@@ -3,7 +3,10 @@
  * `src/lib/blocks/orders.ts` (Orders admin actions that move real stock — fulfil consumes
  * reserved inventory, cancel gives it back) against a simulated Data Gateway, `src/lib/blocks/low-stock.ts`
  * (which inventory rows need attention) and `src/lib/csv.ts` (the CSV codec) and
- * `src/lib/blocks/bulk.ts` (how a CSV row becomes a mutation payload) directly. Same approach and reasoning as the storefront's `npm run verify`: this app has
+ * `src/lib/blocks/bulk.ts` (how a CSV row becomes a mutation payload, and how a Product
+ * import's Product/ProductVariant/WarehouseInventory writes get batched via `insertMany`/
+ * aliased `runBatchUpdate` instead of one call per row) directly. Same approach and reasoning
+ * as the storefront's `npm run verify`: this app has
  * no test runner, adding one is the repo owner's call, and these actions cannot be exercised
  * against the real gateway because neither the Order schema nor the inventory write policies
  * are live yet.
@@ -44,7 +47,9 @@ try {
   const lowStock = await server.ssrLoadModule(resolve(here, "scenarios-low-stock.ts"));
   const csv = await server.ssrLoadModule(resolve(here, "scenarios-csv.ts"));
   const bulk = await server.ssrLoadModule(resolve(here, "scenarios-bulk.ts"));
-  const failures = (await orders.run()) + (await lowStock.run()) + (await csv.run()) + (await bulk.run());
+  const productImport = await server.ssrLoadModule(resolve(here, "scenarios-product-import.ts"));
+  const failures =
+    (await orders.run()) + (await lowStock.run()) + (await csv.run()) + (await bulk.run()) + (await productImport.run());
   await server.close();
   process.exit(failures === 0 ? 0 : 1);
 } catch (error) {

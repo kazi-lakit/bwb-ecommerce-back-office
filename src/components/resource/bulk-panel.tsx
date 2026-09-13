@@ -3,6 +3,7 @@ import { Download, Upload } from "lucide-react";
 import type { EntityMeta } from "@/lib/blocks/schema-meta";
 import type { EntityListParams } from "@/lib/blocks/collections";
 import { applyRows, exportEntity, parseImportFile, type BulkFormat, type ImportOutcome, type RowResult } from "@/lib/blocks/bulk";
+import { importProductsViaWorkflow, type WorkflowImportOutcome } from "@/lib/blocks/workflow-import";
 import { downloadFile } from "@/lib/csv";
 import { toast } from "@/lib/toast-store";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ export function BulkPanel({
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<RowResult[] | null>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
+  const [workflowOutcome, setWorkflowOutcome] = useState<WorkflowImportOutcome | null>(null);
 
   const invalid = preview?.filter((r) => r.errors.length > 0) ?? [];
   const valid = preview?.filter((r) => r.errors.length === 0) ?? [];
@@ -58,6 +60,7 @@ export function BulkPanel({
 
   async function handleFile(file: File) {
     setOutcome(null);
+    setWorkflowOutcome(null);
     try {
       setPreview(parseImportFile(meta, formatFromFilename(file.name), await file.text()));
     } catch (error) {
@@ -82,6 +85,29 @@ export function BulkPanel({
       } else {
         toast.error(`${result.failed.length} row(s) failed — see below.`);
         onDone();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * The alternate path: one Blocks Workflow webhook call instead of this app's own sequential
+   * writes. Create-only (see `workflow-import.ts`'s doc comment for the full list of what it
+   * can't do that the regular Import button can) — offered alongside, not instead of, the
+   * normal path.
+   */
+  async function handleWorkflowImport() {
+    if (!preview) return;
+    setBusy(true);
+    try {
+      const result = await importProductsViaWorkflow(valid);
+      setWorkflowOutcome(result);
+      if (result.ok) {
+        toast.success(`Sent ${result.attempted} product(s) to the import workflow (${result.status ?? "queued"}).`);
+        onDone();
+      } else {
+        toast.error(`Workflow import failed: ${result.error ?? "unknown error"}`);
       }
     } finally {
       setBusy(false);
@@ -182,6 +208,40 @@ export function BulkPanel({
                 Clear
               </Button>
             </div>
+
+            {meta.schemaName === "Product" && (
+              <div className="rounded-md border border-hairline p-3">
+                <p className="text-xs text-muted">
+                  Or send the new (non-update) rows through the <strong className="text-ink">Import Product With
+                  Variants And Stock</strong> workflow instead — one webhook call inserts each product, then its
+                  variants, then their stock, using a workflow-embedded credential so stock writes don&apos;t need
+                  your own session to hold the <code className="text-ink">inventory-operator</code> role. Create-only
+                  (rows with an <code className="text-ink">ItemId</code> are skipped, not duplicated), and it can&apos;t
+                  set <code className="text-ink">CategoryIds</code>/<code className="text-ink">Media</code> — a
+                  platform limit on what a workflow can write, not this app.
+                </p>
+                <Button
+                  className="mt-2"
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy || valid.length === 0}
+                  onClick={() => void handleWorkflowImport()}
+                >
+                  {busy && <Spinner className="h-3.5 w-3.5" />}
+                  Import via Workflow
+                </Button>
+                {workflowOutcome && (
+                  <p className={`mt-2 text-xs ${workflowOutcome.ok ? "text-ink" : "text-brand-error"}`}>
+                    {workflowOutcome.ok
+                      ? `Sent ${workflowOutcome.attempted} product(s) — ${workflowOutcome.status ?? "queued"}` +
+                        (workflowOutcome.skippedExisting > 0
+                          ? ` (${workflowOutcome.skippedExisting} update row(s) skipped — this path is create-only)`
+                          : "")
+                      : workflowOutcome.error}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

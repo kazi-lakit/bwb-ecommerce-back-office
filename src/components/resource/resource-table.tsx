@@ -22,7 +22,13 @@ function Cell({
   unresolvedId?: boolean;
   warning?: string | null;
 }) {
-  if (value == null || value === "") return <span className="text-muted">—</span>;
+  // A record can end up with the literal string "null" instead of a real null/undefined —
+  // e.g. a write path that JSON-stringifies `null` rather than omitting the field (confirmed
+  // via a Blocks Workflow `dataAction` node, which writes exactly this for an unset value).
+  // Treat it the same as genuinely empty rather than showing the word "null" to the user.
+  if (value == null || value === "" || value === "null" || value === "undefined") {
+    return <span className="text-muted">—</span>;
+  }
   if (field.name === "Status" && typeof value === "string") {
     return (
       <span className="inline-flex items-center gap-1.5">

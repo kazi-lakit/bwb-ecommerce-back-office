@@ -90,6 +90,21 @@ function unwrapMutation(response: unknown, fieldName: string): ActionResponse {
   return (dataObj?.[fieldName] as ActionResponse | undefined) ?? {};
 }
 
+/**
+ * `insertMany<Schema>`'s atomic failure (one bad row rejects the whole batch, confirmed live)
+ * leaves its field `null` in `data` and puts the real reason only in the top-level GraphQL
+ * `errors` array — a shape `unwrapMutation` above doesn't look at, since a plain single
+ * create/update/delete has never needed it (their failures show up as an ordinary business
+ * object with its own `message`, confirmed live). Used only by `createMany` below.
+ */
+function unwrapBulkMutation(response: unknown, fieldName: string): BulkActionResponse {
+  const root = response as { data?: Record<string, unknown>; errors?: { message?: string }[] } | undefined;
+  const result = root?.data?.[fieldName] as BulkActionResponse | undefined;
+  if (result) return result;
+  const message = root?.errors?.map((e) => e.message).filter(Boolean).join("; ");
+  return message ? { message } : {};
+}
+
 export interface EntityListParams {
   pageNo?: number;
   pageSize?: number;
@@ -202,7 +217,7 @@ ${selection}
 }`,
           variables: { input: payloads },
         })
-      ).then((res) => unwrapMutation(res, createManyField) as BulkActionResponse),
+      ).then((res) => unwrapBulkMutation(res, createManyField)),
 
     update: (itemId: string, payload: Record<string, unknown>): Promise<ActionResponse> =>
       blocksDataCall(() =>
@@ -310,6 +325,76 @@ export function runBatchList(requests: BatchListRequest[]): Promise<Record<strin
     requests.forEach((req, index) => {
       const value = dataObj?.[`f${index}`] as { items?: EntityRecord[]; totalCount?: number } | undefined;
       result[req.key] = { items: value?.items ?? [], totalCount: value?.totalCount ?? 0 };
+    });
+    return result;
+  });
+}
+
+export interface BatchUpdateRequest {
+  /** Caller-chosen key the result comes back under — need not be a valid GraphQL name. */
+  key: string;
+  schemaName: string;
+  itemId: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Combines N independent `update<Schema>` mutations — different rows, generally different
+ * payloads — into ONE GraphQL request via aliased root fields, the same aliasing technique
+ * `buildBatchListQuery` uses for reads, extended to mutations. There's no native bulk-update
+ * primitive for "N rows, N different payloads" the way `insertMany<Schema>` covers bulk
+ * create (an `updateMany<Schema>` mutation exists, but it applies *one* input to every row
+ * matching a filter — not what an import's per-row updates need); this is the batching this
+ * shape of write actually gets.
+ *
+ * Each aliased field resolves independently: a bad payload in one row fails only that row.
+ * GraphQL only throws away the HTTP layer on a non-2xx status (confirmed against the SDK's
+ * own `http-client.js` — it never inspects a 200 response's `errors` array), so a per-row
+ * business failure just leaves that alias's data `null` in an otherwise-200 response; it
+ * doesn't take down the rest of the batch the way `insertMany`'s all-or-nothing atomicity
+ * would.
+ */
+export function buildBatchUpdateQuery(requests: BatchUpdateRequest[]): { query: string; variables: Record<string, unknown> } {
+  const varDecls: string[] = [];
+  const fields: string[] = [];
+  const variables: Record<string, unknown> = {};
+
+  requests.forEach((req, index) => {
+    const alias = `f${index}`;
+    const updateField = `update${req.schemaName}`;
+    const whereVar = `${alias}_where`;
+    const inputVar = `${alias}_input`;
+
+    varDecls.push(`$${whereVar}: ${req.schemaName}FilterInput`, `$${inputVar}: ${req.schemaName}UpdateInput!`);
+    fields.push(`  ${alias}: ${updateField}(where: $${whereVar}, input: $${inputVar}) {
+    acknowledged
+    itemId
+    message
+    totalImpactedData
+  }`);
+    variables[whereVar] = itemIdWhere(req.itemId);
+    variables[inputVar] = req.payload;
+  });
+
+  const query = `mutation BatchUpdate(${varDecls.join(", ")}) {
+${fields.join("\n")}
+}`;
+  return { query, variables };
+}
+
+/** Runs `buildBatchUpdateQuery` and unwraps each alias back to the caller's own `key`. */
+export function runBatchUpdate(requests: BatchUpdateRequest[]): Promise<Record<string, ActionResponse>> {
+  if (requests.length === 0) return Promise.resolve({});
+
+  const { query, variables } = buildBatchUpdateQuery(requests);
+  return blocksDataCall(() =>
+    blocksClient.data.graphql({ operationName: "BatchUpdate", query, variables })
+  ).then((response) => {
+    const root = response as Record<string, unknown> | undefined;
+    const dataObj = (root?.data ?? root) as Record<string, unknown> | undefined;
+    const result: Record<string, ActionResponse> = {};
+    requests.forEach((req, index) => {
+      result[req.key] = (dataObj?.[`f${index}`] as ActionResponse | undefined) ?? {};
     });
     return result;
   });
