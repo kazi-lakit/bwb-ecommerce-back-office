@@ -321,6 +321,23 @@ function OrderDetail({
           records the outcome here — the mitigation the architecture doc prescribes, and the
           reason this button exists at all. Admin-gated: it's a money decision.
         */}
+        {/*
+          This check is the only thing standing between the shop and a forged total. Order
+          monetary fields are written by the storefront client (Order write access is User) and
+          the platform can't recompute them server-side, so a customer who bypasses the UI can
+          post any GrandTotal they like. Nothing catches that except a person comparing this
+          figure against what the provider actually received — which is why the amount is
+          stated here, in the dialog, rather than left to be looked up in the drawer behind it.
+          See the docs repo's task breakdown §1.6.
+        */}
+        {!paid && !cancelled && (
+          <p className="rounded-md border border-brand-warn/40 bg-brand-warn/10 px-3 py-2 text-xs text-ink">
+            Check <strong>{formatCurrency(order.GrandTotal, order.Currency)}</strong> was actually received
+            before recording payment — order totals are set by the customer's browser and aren't
+            verified anywhere else.
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -329,7 +346,9 @@ function OrderDetail({
               onConfirm({
                 title: "Record payment as received?",
                 body:
-                  `Confirm only after checking the payment provider's own dashboard for ${order.OrderNumber}. ` +
+                  `Confirm ${formatCurrency(order.GrandTotal, order.Currency)} was received for ` +
+                  `${order.OrderNumber} — check the payment provider's own dashboard, not this screen. ` +
+                  `Order totals come from the customer's browser and are not verified server-side. ` +
                   `This marks the order Confirmed and Paid${actorName ? `, recorded against ${actorName}` : ""}.`,
                 run: async () => {
                   await confirmPayment(order);
