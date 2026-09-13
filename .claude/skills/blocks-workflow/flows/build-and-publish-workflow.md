@@ -8,6 +8,8 @@ All request/response field details referenced below live in [../references/api-e
 
 Pick a trigger (`webhook`, `schedule`, `email`, or `dataGateway`) and the action/logic/transform nodes downstream, from the node type catalog (`references/node-graph-schema.md` §4). Sketch node ids, and which edges connect them — every edge needs `sourceHandle`/`targetHandle`; only the `if` node has more than one `sourceHandle` (`if-true`/`if-false`).
 
+Before sending any JSON in steps 2–3, run it through [../references/validation-checklist.md](../references/validation-checklist.md) — `Create`/`Update` do not validate node/edge shape or parameter correctness themselves; a mistake is stored as-is and fails later, often silently.
+
 ## 2. Create the workflow
 
 ```

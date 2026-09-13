@@ -525,21 +525,37 @@ export async function applyRows(meta: EntityMeta, rows: RowResult[]): Promise<Im
   const api = createEntityApi(meta.schemaName);
   const outcome: ImportOutcome = { created: 0, updated: 0, failed: [] };
 
+  const updateRows: RowResult[] = [];
+  const createRows: RowResult[] = [];
   for (const row of rows) {
-    if (row.errors.length > 0) {
-      outcome.failed.push({ line: row.line, message: row.errors.join("; ") });
-      continue;
-    }
+    if (row.errors.length > 0) outcome.failed.push({ line: row.line, message: row.errors.join("; ") });
+    else if (row.itemId) updateRows.push(row);
+    else createRows.push(row);
+  }
+
+  // Updates carry a different payload per row, so there's no single-call primitive for them —
+  // apply one at a time, same as before.
+  for (const row of updateRows) {
     try {
-      if (row.itemId) {
-        await api.update(row.itemId, row.payload);
-        outcome.updated += 1;
-      } else {
-        await api.create(row.payload);
-        outcome.created += 1;
-      }
+      await api.update(row.itemId!, row.payload);
+      outcome.updated += 1;
     } catch (error) {
       outcome.failed.push({ line: row.line, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  // New rows have no cross-row dependency, so they go in as one `insertMany` mutation
+  // instead of N round trips. It's all-or-nothing server-side (one bad row, e.g. a
+  // duplicate unique field, fails every row in the batch, confirmed live) — so a failure
+  // here is reported against every create-row together, not pinpointed to the one that
+  // actually caused it; the mutation's own error message is the best lead for which field.
+  if (createRows.length > 0) {
+    try {
+      const result = await api.createMany(createRows.map((row) => row.payload));
+      outcome.created += result.itemIds?.length ?? createRows.length;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const row of createRows) outcome.failed.push({ line: row.line, message });
     }
   }
 

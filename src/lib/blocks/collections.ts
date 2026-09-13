@@ -19,6 +19,14 @@ export interface ActionResponse {
   message?: string;
 }
 
+export interface BulkActionResponse {
+  acknowledged?: boolean;
+  /** One id per input payload, in the same order — confirmed live against the Data Gateway. */
+  itemIds?: string[];
+  totalImpactedData?: number;
+  message?: string;
+}
+
 export function getEntityMeta(schemaName: string): EntityMeta {
   const meta = ENTITY_SCHEMAS[schemaName];
   if (!meta) throw new Error(`Unknown entity schema: ${schemaName}`);
@@ -112,6 +120,7 @@ export function createEntityApi(schemaName: string) {
   const meta = getEntityMeta(schemaName);
   const listField = `get${schemaName}s`;
   const createField = `insert${schemaName}`;
+  const createManyField = `insertMany${schemaName}`;
   const updateField = `update${schemaName}`;
   const deleteField = `delete${schemaName}`;
   const selection = buildSelection(meta);
@@ -169,6 +178,31 @@ ${selection}
           variables: { input: payload },
         })
       ).then((res) => unwrapMutation(res, createField)),
+
+    /**
+     * One request creates every payload, via the Data Gateway's own `insertMany<Schema>`
+     * mutation — confirmed live (introspection shows it's generated for every schema, not
+     * just this project's). This is atomic on the server's side: a single invalid payload
+     * (e.g. a duplicate unique field) fails the *entire* batch with no partial writes, rather
+     * than skipping just that one row — confirmed by testing a duplicate-slug row sandwiched
+     * between two valid ones, which left all three uncreated. Callers that need per-row
+     * fault isolation should fall back to sequential `create()` calls instead.
+     */
+    createMany: (payloads: Record<string, unknown>[]): Promise<BulkActionResponse> =>
+      blocksDataCall(() =>
+        blocksClient.data.graphql({
+          operationName: createManyField,
+          query: `mutation ${createManyField}($input: [${schemaName}InsertInput!]) {
+  ${createManyField}(input: $input) {
+    acknowledged
+    itemIds
+    message
+    totalImpactedData
+  }
+}`,
+          variables: { input: payloads },
+        })
+      ).then((res) => unwrapMutation(res, createManyField) as BulkActionResponse),
 
     update: (itemId: string, payload: Record<string, unknown>): Promise<ActionResponse> =>
       blocksDataCall(() =>

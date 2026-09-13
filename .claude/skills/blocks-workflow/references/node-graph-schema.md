@@ -53,6 +53,21 @@ send, it binds as long as the letters match. Empirically, most node types' real 
 matching their C# `*Parameters` class property names verbatim. **Do not assume camelCase inside
 `parameters` — copy the exact key casing from the per-type table in §4.**
 
+**Sharper rule for trigger nodes — exact casing is not just convention, it's load-bearing.**
+The case-insensitive Newtonsoft binding above only applies to `NodeExecutorBase<TParameters>`,
+which runs an already-selected node's own execution. **Trigger matching/dispatch happens earlier**
+and reads the raw `BsonDocument` directly with exact-key, case-sensitive lookups — verified in
+`server/Workflow.DomainService/Services/WorkflowExecutionService.cs` (`Parameters.GetValue("authType")`,
+`.GetValue("httpResponseMode")`, `.GetValue("httpResponseData")`; `Parameters.Contains("mailServerConfigurationId")`
+/`["mailServerConfigurationId"]`; `Parameters.Contains("collectionName")`/`["collectionName"]`/`["operation"]`)
+and `WorkflowService.cs` (`Parameters.Contains("cronExpression")`/`["cronExpression"]`,
+`node.Parameters["scheduleItemId"]`). `MongoDB.Bson.BsonDocument`'s indexer/`Contains`/`GetValue` do
+**not** ignore case. Sending `AuthType` instead of `authType`, or `CollectionName` instead of
+`collectionName`, means the lookup finds nothing — the field silently reads as absent/null (wrong
+auth type treated as `"none"`, a schedule trigger treated as having no `cronExpression` and failing
+publish, an email/data trigger that never matches any event) rather than erroring. **Always send the
+exact casing shown in §4, with no exceptions, for every trigger node's `parameters`.**
+
 ---
 
 ## 2. Graph shape
