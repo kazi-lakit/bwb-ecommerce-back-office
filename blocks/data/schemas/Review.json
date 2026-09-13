@@ -1,0 +1,62 @@
+{
+  "schemaName": "Review",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "Product being reviewed."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "Variant reviewed, when the customer chose one."
+    },
+    {
+      "name": "CustomerId",
+      "type": "String",
+      "description": "IAM UserId of the author. Set from the authenticated caller."
+    },
+    {
+      "name": "AuthorName",
+      "type": "String",
+      "description": "Display name snapshot, so a later profile change doesn't rewrite history."
+    },
+    {
+      "name": "Rating",
+      "type": "Int",
+      "description": "1 to 5."
+    },
+    {
+      "name": "Title",
+      "type": "String",
+      "description": "Short headline."
+    },
+    {
+      "name": "Body",
+      "type": "String",
+      "description": "The review text."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "pending, approved, or rejected. Staff-only (see CLS policies)."
+    },
+    {
+      "name": "ModeratorNote",
+      "type": "String",
+      "description": "Internal note on the moderation decision. Staff-only."
+    },
+    {
+      "name": "IsVerifiedPurchase",
+      "type": "Boolean",
+      "description": "Whether the author actually bought it. Not enforceable client-side \u2014 see the .md."
+    },
+    {
+      "name": "HelpfulCount",
+      "type": "Int",
+      "description": "Upvotes. Not wired up."
+    }
+  ],
+  "collectionName": "blx_Reviews"
+}

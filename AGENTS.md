@@ -41,15 +41,17 @@ The app builds and runs in a container via the standard Blocks OS convention
   locally bakes your `.env.local` values, not `.env.dev`'s. The Docker build is
   unaffected (`.dockerignore` excludes `.env.local`); don't run `build:*` locally
   expecting deployed values.
-- **`.env.dev`** is now gitignored (only `.env.example` is exempted — changed 2026-09-13; it
-  used to be tracked so fresh CI checkouts could build without a separate provisioning step).
-  A fresh clone's Docker build needs `.env.dev` supplied another way now — CI secret
-  injection, a build-time write step, etc. — or `build:dev` has nothing to copy into `.env`.
-  It holds this project's real (non-secret) values already: `VITE_BLOCKS_APP_DOMAIN` is the
-  live `https://dwyxlp-ekqyt.slsblx.com`, already registered as a redirect URI on the OIDC
-  client. If the deployed domain ever changes, register the new one via `blocks auth
-  oidc-clients save --item-id <id> --redirect-uris "<full list incl. the new one>"` — it
-  replaces the whole list, so include every URI still needed, not just the new one.
+- **`.env.dev`** is tracked in git (un-ignored in `.gitignore` alongside `.env.example`) so
+  fresh CI checkouts can build — briefly gitignored 2026-09-13, reverted the same day once a
+  deploy broke on a fresh checkout with no other provisioning step in place for it. It holds
+  this project's real (non-secret) values already: `VITE_BLOCKS_APP_DOMAIN` is the live
+  `https://dwyxlp-ekqyt.slsblx.com`, already registered as a redirect URI on the OIDC client.
+  If the deployed domain ever changes, register the new one via `blocks auth oidc-clients
+  save --item-id <id> --redirect-uris "<full list incl. the new one>"` — it replaces the
+  whole list, so include every URI still needed, not just the new one.
+  `set-env.cjs` also now falls back to `process.env` (the deployment platform's own
+  Key-Vault-backed env vars) when `.env.dev` is missing, rather than hard-failing — so either
+  path works, but the tracked file remains the default.
 
 ## Data model
 

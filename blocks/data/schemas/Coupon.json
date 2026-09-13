@@ -1,0 +1,73 @@
+{
+  "schemaName": "Coupon",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "Code",
+      "type": "String",
+      "description": "The code a customer types. Uppercase by convention.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Description",
+      "type": "String",
+      "description": "Internal description \u2014 what this coupon is for."
+    },
+    {
+      "name": "DiscountType",
+      "type": "String",
+      "description": "percentage or fixed."
+    },
+    {
+      "name": "DiscountValue",
+      "type": "Float",
+      "description": "Percent (for percentage) or amount (for fixed)."
+    },
+    {
+      "name": "Currency",
+      "type": "String",
+      "description": "ISO currency code. Only meaningful for a fixed discount."
+    },
+    {
+      "name": "MinimumSubtotal",
+      "type": "Float",
+      "description": "Smallest order subtotal this coupon applies to. 0 or unset means no minimum."
+    },
+    {
+      "name": "MaximumDiscount",
+      "type": "Float",
+      "description": "Caps a percentage discount. 0 or unset means no cap."
+    },
+    {
+      "name": "StartsDate",
+      "type": "DateTime",
+      "description": "First moment the coupon is usable. Unset means immediately."
+    },
+    {
+      "name": "ExpiresDate",
+      "type": "DateTime",
+      "description": "Last moment the coupon is usable. Unset means no expiry."
+    },
+    {
+      "name": "UsageLimit",
+      "type": "Int",
+      "description": "Total redemptions allowed across all customers. 0 or unset means unlimited."
+    },
+    {
+      "name": "UsageCount",
+      "type": "Int",
+      "description": "Redemptions so far. See the .md \u2014 this is not reliably enforceable."
+    },
+    {
+      "name": "PerCustomerLimit",
+      "type": "Int",
+      "description": "Redemptions allowed per customer. Not enforced yet \u2014 see the .md."
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "active, paused, or expired."
+    }
+  ],
+  "collectionName": "blx_Coupons"
+}

@@ -26,6 +26,21 @@
       "name": "Incoming",
       "type": "Float",
       "description": "Confirmed quantity expected from purchase orders or transfers."
+    },
+    {
+      "name": "Blocked",
+      "type": "Float",
+      "description": "Quantity administratively withheld from sale (hold, recall, legal) but still physically present."
+    },
+    {
+      "name": "Backordered",
+      "type": "Float",
+      "description": "Quantity sold beyond on-hand stock and owed to customers."
+    },
+    {
+      "name": "InTransit",
+      "type": "Float",
+      "description": "Quantity dispatched on an outbound transfer, no longer on hand here and not yet received elsewhere."
     }
   ]
 }

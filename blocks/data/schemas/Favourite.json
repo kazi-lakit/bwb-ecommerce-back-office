@@ -1,0 +1,22 @@
+{
+  "schemaName": "Favourite",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "CustomerId",
+      "type": "String",
+      "description": "IAM UserId of the owner. Set from the authenticated caller, never from client input."
+    },
+    {
+      "name": "ProductId",
+      "type": "String",
+      "description": "The favourited product."
+    },
+    {
+      "name": "VariantId",
+      "type": "String",
+      "description": "The specific variant, when the customer picked one."
+    }
+  ],
+  "collectionName": "blx_Favourites"
+}
