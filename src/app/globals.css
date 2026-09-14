@@ -9,12 +9,12 @@
 :root {
   color-scheme: light;
 
-  --color-primary: #696cff;
+  --color-primary: #ea580c;
   --color-on-primary: #ffffff;
-  --color-brand-accent: #696cff;
-  --color-brand-accent-deep: #5f61e6;
-  --color-brand-accent-soft: #e7e7ff;
-  --color-brand-warn: #ffab00;
+  --color-brand-accent: #ea580c;
+  --color-brand-accent-deep: #c2410c;
+  --color-brand-accent-soft: #ffedd5;
+  --color-brand-warn: #d97706;
   --color-brand-error: #ff3e1d;
   --color-brand-success: #71dd37;
   /* Deeper than --color-brand-success/-warn themselves — those are tuned to sit as a
@@ -51,13 +51,13 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-primary: #7d80ff;
+  --color-primary: #fb923c;
   --color-on-primary: #ffffff;
   --color-charcoal: #d5d7de;
 
-  --color-brand-accent: #7d80ff;
-  --color-brand-accent-deep: #696cff;
-  --color-brand-accent-soft: #34365d;
+  --color-brand-accent: #fb923c;
+  --color-brand-accent-deep: #f97316;
+  --color-brand-accent-soft: #4a2c20;
   --color-brand-warn: #e0a839;
   --color-brand-error: #ea8a8a;
   --color-brand-success: #2ee0ac;
@@ -131,6 +131,101 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+@keyframes cartio-header-letter-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cartio-header-logo__dot {
+  animation: cartio-dot-appear 0.68s ease-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cartio-header-logo__lower,
+.cartio-header-logo__upper {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.cartio-header-logo__lower {
+  animation: cartio-draw-lower 0.68s ease-in-out both;
+}
+
+.cartio-header-logo__upper {
+  animation: cartio-draw-upper 0.68s ease-in-out both;
+}
+
+.cartio-header-logo__letter {
+  animation: cartio-header-letter-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cartio-header-logo__letter--1 { animation-delay: 0.56s; }
+.cartio-header-logo__letter--2 { animation-delay: 0.62s; }
+.cartio-header-logo__letter--3 { animation-delay: 0.68s; }
+.cartio-header-logo__letter--4 { animation-delay: 0.74s; }
+.cartio-header-logo__letter--5 { animation-delay: 0.80s; }
+.cartio-header-logo__letter--6 { animation-delay: 0.86s; }
+
+@keyframes cartio-dot-appear {
+  0%,
+  4% {
+    transform: scale(0);
+  }
+  12%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cartio-draw-lower {
+  0%,
+  15% {
+    stroke-dashoffset: 1;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cartio-draw-upper {
+  0%,
+  54% {
+    stroke-dashoffset: 1;
+  }
+  90%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartio-header-logo__dot,
+  .cartio-header-logo__lower,
+  .cartio-header-logo__upper,
+  .cartio-header-logo__letter {
+    animation: none;
+  }
+
+  .cartio-header-logo__dot {
+    transform: scale(1);
+  }
+
+  .cartio-header-logo__lower,
+  .cartio-header-logo__upper {
+    stroke-dashoffset: 0;
+  }
 }
 
 .admin-card {

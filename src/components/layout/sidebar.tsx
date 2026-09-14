@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
-import { ChevronLeft, PackageOpen, X } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { ChevronLeft, X } from "lucide-react";
 import clsx from "clsx";
+import { CartioAnimatedLogo } from "@/components/brand/cartio-animated-logo";
 import { ADMIN_NAV_ITEMS, DASHBOARD_NAV_ITEM } from "./nav-items";
 
 const COLLAPSE_KEY = "admin-sidebar-collapsed";
@@ -39,6 +40,8 @@ function NavSection({ label, children, collapsed }: { label: string; children: R
 
 export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const location = useLocation();
+  const animateLogo = location.pathname === "/admin";
 
   useEffect(() => {
     try {
@@ -59,11 +62,10 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
   const content = (
     <>
-      <div className={clsx("flex h-[5.25rem] flex-none items-center gap-3 px-6", collapsed && "justify-center px-3")}>
-        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-brand-accent text-on-dark shadow-sm">
-          <PackageOpen size={20} strokeWidth={2.4} />
-        </div>
-        {!collapsed && <span className="truncate text-xl font-semibold tracking-tight text-ink">BWB Commerce</span>}
+      <div className={clsx("flex h-[5.25rem] flex-none items-center gap-3 border-b border-hairline-soft px-5", collapsed && "justify-center px-3")}>
+        <NavLink to="/admin" end aria-label="Cartio dashboard" className="flex min-w-0 items-center">
+          <CartioAnimatedLogo animated={animateLogo} compact={collapsed} className={collapsed ? "h-10" : "h-9 max-w-[142px]"} />
+        </NavLink>
         <button type="button" onClick={onCloseMobile} aria-label="Close navigation" className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-steel hover:bg-surface md:hidden">
           <X size={18} />
         </button>

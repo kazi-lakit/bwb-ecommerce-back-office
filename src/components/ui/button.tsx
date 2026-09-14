@@ -10,8 +10,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: "rounded-md bg-brand-accent text-on-dark shadow-[0_2px_4px_rgba(105,108,255,0.35)] hover:bg-brand-accent-deep disabled:bg-hairline disabled:text-muted disabled:shadow-none",
-  accent: "rounded-md bg-brand-accent text-on-dark shadow-[0_2px_4px_rgba(105,108,255,0.35)] hover:bg-brand-accent-deep",
+  primary: "rounded-md bg-brand-accent text-on-dark shadow-[0_5px_14px_rgba(234,88,12,0.24)] hover:bg-brand-accent-deep disabled:bg-hairline disabled:text-muted disabled:shadow-none",
+  accent: "rounded-md bg-brand-accent text-on-dark shadow-[0_5px_14px_rgba(234,88,12,0.24)] hover:bg-brand-accent-deep",
   secondary: "rounded-md border border-hairline bg-canvas text-steel hover:bg-surface hover:text-ink",
   ghost: "bg-transparent text-ink hover:bg-surface rounded-md",
   danger: "rounded-md border border-brand-error/30 bg-brand-error/10 text-brand-error hover:bg-brand-error/15",

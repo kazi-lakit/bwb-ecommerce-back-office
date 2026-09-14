@@ -23,8 +23,9 @@ export function LowStockPanel({ warehouseId, limit }: { warehouseId?: string; li
 
   if (isLoading) {
     return (
-      <div className="flex justify-center rounded-lg border border-hairline py-10">
+      <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-hairline bg-canvas py-10 shadow-[var(--shadow-card)]">
         <Spinner className="h-5 w-5" />
+        <p className="mt-3 text-xs font-medium text-muted">Checking inventory thresholds</p>
       </div>
     );
   }
@@ -32,18 +33,23 @@ export function LowStockPanel({ warehouseId, limit }: { warehouseId?: string; li
   const nothingWrong = out.length === 0 && low.length === 0;
 
   return (
-    <section className="rounded-lg border border-hairline">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
-        <h2 className="text-sm font-semibold text-ink">Needs attention</h2>
-        <Link to="/admin/warehouse-inventory" className="text-xs text-brand-accent hover:underline">
-          All inventory
+    <section className="overflow-hidden rounded-xl border border-hairline bg-canvas shadow-[var(--shadow-card)]">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline-soft px-5 py-5 sm:px-6">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-accent">Inventory health</p>
+          <h2 className="mt-1 text-base font-semibold text-ink">Needs attention</h2>
+          <p className="mt-1 text-xs text-muted">Stock at zero or below its configured reorder point.</p>
+        </div>
+        <Link to="/admin/warehouse-inventory" className="rounded-full border border-hairline px-3 py-1.5 text-xs font-semibold text-brand-accent hover:bg-brand-accent-soft">
+          View inventory
         </Link>
       </header>
 
       {nothingWrong ? (
-        <p className="px-4 py-6 text-sm text-muted">
-          Nothing out of stock or below its reorder point{isPartial ? " in the rows checked" : ""}.
-        </p>
+        <div className="px-5 py-9 text-center sm:px-6">
+          <p className="text-sm font-medium text-ink">Inventory looks healthy</p>
+          <p className="mt-1 text-xs text-muted">Nothing out of stock or below its reorder point{isPartial ? " in the rows checked" : ""}.</p>
+        </div>
       ) : (
         <div className="divide-y divide-hairline-soft">
           {out.length > 0 && (

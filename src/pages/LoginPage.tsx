@@ -1,7 +1,8 @@
 import { Navigate } from "react-router-dom";
-import { PackageOpen } from "lucide-react";
+import { ArrowRight, BadgeCheck } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { startLogin } from "@/lib/blocks/auth";
+import { CartioAnimatedLogo } from "@/components/brand/cartio-animated-logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -28,19 +29,23 @@ export default function LoginPage() {
   if (status === "authenticated") return <Navigate to="/admin" replace />;
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-canvas px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-admin-canvas px-4 py-10">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
-      <div className="admin-card w-full max-w-sm p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-accent text-on-dark shadow-sm">
-          <PackageOpen size={24} strokeWidth={2.4} />
+      <div className="w-full max-w-md rounded-xl border border-hairline bg-canvas p-7 shadow-[var(--shadow-card)] sm:p-10">
+        <CartioAnimatedLogo className="h-11" />
+        <div className="mt-8 border-t border-hairline-soft pt-8">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-accent">Back office</p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink">Welcome to your commerce workspace</h1>
+          <p className="mt-3 text-sm leading-6 text-steel">Manage catalog, inventory, warehouses, suppliers, and purchasing from one secure console.</p>
         </div>
-        <h1 className="text-lg font-semibold text-ink">BWB Commerce</h1>
-        <p className="mt-1 text-sm text-muted">Staff console for product and inventory management.</p>
         <Button className="mt-6 w-full" onClick={() => void startLogin()}>
-          Staff sign in
+          Staff sign in <ArrowRight size={16} />
         </Button>
+        <p className="mt-5 flex items-center justify-center gap-2 text-xs text-muted">
+          <BadgeCheck size={14} className="text-brand-accent" /> Authorized staff access only
+        </p>
       </div>
     </div>
   );
