@@ -14,11 +14,13 @@ export const store: {
   products: Record<string, unknown>[];
   variants: Record<string, unknown>[];
   warehouses: Record<string, unknown>[];
+  categories: Record<string, unknown>[];
   nextId: number;
   failInsertManyFor: string | null;        // schemaName whose next insertMany should error, atomically
 } = {
   rows: [], movements: [], casResultOverride: [], failMovement: false, rejectUnknownBuckets: false, denyWrites: false,
-  reservations: [], failReservationInsert: false, orders: [], products: [], variants: [], warehouses: [], nextId: 1, failInsertManyFor: null,
+  reservations: [], failReservationInsert: false, orders: [], products: [], variants: [], warehouses: [], categories: [],
+  nextId: 1, failInsertManyFor: null,
 };
 
 export function reset(rows: Row[]) {
@@ -27,7 +29,7 @@ export function reset(rows: Row[]) {
   store.failMovement = false; store.denyWrites = false; store.onCas = undefined;
   store.reservations = []; store.failReservationInsert = false; store.onReservationUpdate = undefined;
   store.orders = [];
-  store.products = []; store.variants = []; store.warehouses = [];
+  store.products = []; store.variants = []; store.warehouses = []; store.categories = [];
   store.nextId = 1; store.failInsertManyFor = null;
 }
 
@@ -52,6 +54,7 @@ function collectionFor(schemaName: string): Record<string, unknown>[] {
     case "ProductVariant": return store.variants;
     case "Warehouse": return store.warehouses;
     case "WarehouseInventory": return store.rows as unknown as Record<string, unknown>[];
+    case "Category": return store.categories;
     default: throw new Error(`fake-client: no collection wired for schema ${schemaName}`);
   }
 }
@@ -64,8 +67,11 @@ export const blocksClient = {
     async graphql(req: any): Promise<any> {
       const { operationName, query, variables } = req;
 
-      if (operationName === "getProducts" || operationName === "getProductVariants" || operationName === "getWarehouses") {
-        const schemaName = operationName === "getProducts" ? "Product" : operationName === "getProductVariants" ? "ProductVariant" : "Warehouse";
+      if (operationName === "getProducts" || operationName === "getProductVariants" || operationName === "getWarehouses" || operationName === "getCategorys") {
+        const schemaName =
+          operationName === "getProducts" ? "Product" :
+          operationName === "getProductVariants" ? "ProductVariant" :
+          operationName === "getWarehouses" ? "Warehouse" : "Category";
         const items = collectionFor(schemaName).filter((r) => matchesWhere(variables.where, r));
         return { data: { [operationName]: { items, totalCount: items.length } } };
       }

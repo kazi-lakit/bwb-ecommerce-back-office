@@ -1,6 +1,7 @@
 import { reset, store } from "./fake-client";
 import { applyRows, type ImportedStockEntry, type ImportedVariant, type RowResult } from "@/lib/blocks/bulk";
 import { getEntityMeta } from "@/lib/blocks/collections";
+import { expandCategoryIds } from "@/lib/blocks/category-tree";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -104,6 +105,36 @@ export async function run(): Promise<number> {
     store.variants.find((v) => v.Sku === "SKU-NEW")!.ProductId === newProduct.ItemId &&
       store.variants.find((v) => v.Sku === "SKU-UPD")!.ProductId === "P-EXIST"
   );
+
+  console.log("\nP6. expandCategoryIds walks the full ancestor chain, deduped, leaf-first");
+  const testCategories: Parameters<typeof expandCategoryIds>[1] = [
+    { ItemId: "living-room", Ancestors: [] },
+    { ItemId: "sofas", Ancestors: [{ CategoryId: "living-room", Name: "Living Room", Slug: "living-room" }] },
+    { ItemId: "coffee-tables", Ancestors: [{ CategoryId: "living-room", Name: "Living Room", Slug: "living-room" }] },
+  ];
+  check(
+    "a leaf category expands to itself plus its parent",
+    JSON.stringify(expandCategoryIds(["sofas"], testCategories)) === JSON.stringify(["sofas", "living-room"])
+  );
+  check(
+    "two leaves under the same parent share the parent once, not twice",
+    JSON.stringify(expandCategoryIds(["sofas", "coffee-tables"], testCategories)) ===
+      JSON.stringify(["sofas", "living-room", "coffee-tables"])
+  );
+  check("an id with no matching category still passes through untouched", JSON.stringify(expandCategoryIds(["ghost"], testCategories)) === JSON.stringify(["ghost"]));
+  check("empty selection stays empty", expandCategoryIds([], testCategories).length === 0);
+
+  console.log("\nP7. importing a product assigned to a leaf category stores the ancestor too");
+  reset([]);
+  store.warehouses = [{ ItemId: "WH1", Code: "WH-MAIN" }];
+  store.categories = [
+    { ItemId: "living-room", Name: "Living Room", Ancestors: [] },
+    { ItemId: "sofas", Name: "Sofas", Ancestors: [{ CategoryId: "living-room", Name: "Living Room", Slug: "living-room" }] },
+  ];
+  outcome = await applyRows(productMeta, [row(2, { Name: "Belmont Sofa", Slug: "belmont-sofa", CategoryIds: ["sofas"] })]);
+  check("no failures", outcome.failed.length === 0, JSON.stringify(outcome.failed));
+  const storedCategoryIds = store.products[0]!.CategoryIds as string[];
+  check("stored CategoryIds includes both the leaf and its ancestor", JSON.stringify(storedCategoryIds) === JSON.stringify(["sofas", "living-room"]), JSON.stringify(storedCategoryIds));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   return fail;

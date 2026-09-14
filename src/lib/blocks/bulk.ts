@@ -1,4 +1,5 @@
 import { createEntityApi, getEntityMeta, runBatchList, runBatchUpdate, type EntityListParams } from "./collections";
+import { expandCategoryIds } from "./category-tree";
 import { isComplexFieldType, type EntityMeta } from "./schema-meta";
 import { toCsv, parseCsv, type ParsedCsv } from "@/lib/csv";
 
@@ -681,6 +682,17 @@ async function applyProductRows(rows: RowResult[]): Promise<ImportOutcome> {
       const sku = v.Sku as string | undefined;
       const id = (v.ItemId ?? v.itemId) as string | undefined;
       if (sku && id) existingVariantIdBySku.set(sku, id);
+    }
+  }
+
+  // A row's CategoryIds must carry the full ancestor path, not just what the file listed —
+  // see category-tree.ts. Only fetched when this import actually touches the field.
+  if (okRows.some((row) => Array.isArray(row.payload.CategoryIds) && (row.payload.CategoryIds as unknown[]).length > 0)) {
+    const categories = await createEntityApi("Category").list({ pageSize: MAX_EXPORT_ROWS });
+    for (const row of okRows) {
+      if (Array.isArray(row.payload.CategoryIds)) {
+        row.payload.CategoryIds = expandCategoryIds(row.payload.CategoryIds as string[], categories.items);
+      }
     }
   }
 

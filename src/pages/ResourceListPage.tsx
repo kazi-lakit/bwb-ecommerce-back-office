@@ -6,6 +6,7 @@ import { ENTITY_ORDER } from "@/lib/blocks/schema-meta";
 import { getEntityMeta, type EntityRecord } from "@/lib/blocks/collections";
 import { useEntityList, useEntityMutations } from "@/lib/blocks/hooks";
 import { useReferenceLabels } from "@/lib/blocks/use-reference-labels";
+import { expandCategoryIds } from "@/lib/blocks/category-tree";
 import {
   ADMIN_ONLY_EDIT_SCHEMAS,
   NO_DELETE_SCHEMAS,
@@ -81,6 +82,18 @@ export default function ResourceListPage() {
   const isProduct = schemaName === "Product";
   const isWarehouse = schemaName === "Warehouse";
 
+  // Full category tree (not just this page's rows) — needed to expand a product's directly
+  // assigned categories into the full ancestor path before every create/update. Only fetched
+  // for the Product list, where it's actually used.
+  const allCategories = useEntityList("Category", { pageSize: 200 }, isProduct);
+
+  /** A product's CategoryIds must hold the full path (leaf + every ancestor), not just what
+   * was clicked — see category-tree.ts. Every other schema's payload passes through untouched. */
+  function withExpandedCategoryIds(payload: Record<string, unknown>): Record<string, unknown> {
+    if (!isProduct || !Array.isArray(payload.CategoryIds)) return payload;
+    return { ...payload, CategoryIds: expandCategoryIds(payload.CategoryIds as string[], allCategories.data?.items ?? []) };
+  }
+
   const { referenceLabels, lookupsBySchema } = useReferenceLabels(meta, items);
   const placeholders = useMemo(() => (isProduct ? assignPlaceholders(items, theme) : []), [isProduct, items, theme]);
 
@@ -153,7 +166,7 @@ export default function ResourceListPage() {
   }
 
   function handleCreate(payload: Record<string, unknown>) {
-    mutations.create.mutate(payload, {
+    mutations.create.mutate(withExpandedCategoryIds(payload), {
       onSuccess: () => {
         toast.success(`${label} created.`);
         closeModals();
@@ -165,7 +178,7 @@ export default function ResourceListPage() {
     if (!editing) return;
     const itemId = (editing.ItemId ?? editing.itemId) as string;
     mutations.update.mutate(
-      { itemId, payload },
+      { itemId, payload: withExpandedCategoryIds(payload) },
       {
         onSuccess: () => {
           toast.success(`${label} updated.`);
