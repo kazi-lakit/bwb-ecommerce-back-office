@@ -1,7 +1,10 @@
 import { blocksClient } from "./client";
 import { blocksDataCall } from "./http";
 
-export const STOREFRONT_CONTENT_LIVE = import.meta.env.VITE_STOREFRONT_CONTENT_LIVE === "true";
+// The schema is part of the live Cartio data model. Keep an explicit false escape hatch
+// for maintenance, but never turn the editor into a setup-only screen merely because a
+// deployment omitted the optional flag.
+export const STOREFRONT_CONTENT_LIVE = import.meta.env.VITE_STOREFRONT_CONTENT_LIVE !== "false";
 export const HOME_HERO_KEY = "home-primary";
 
 export interface StorefrontHeroContent {

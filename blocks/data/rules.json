@@ -359,7 +359,84 @@
       },
       "priority": 1,
       "isAllowPolicy": true
+    },
+    {
+      "schemaName": "StorefrontHero",
+      "policyName": "admin role can create storefront hero content",
+      "policyDescription": "Only back-office administrators may create storefront hero content.",
+      "policyType": 0,
+      "operation": 1,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "StorefrontHero",
+      "policyName": "admin role can edit storefront hero content",
+      "policyDescription": "Only back-office administrators may edit or publish storefront hero content.",
+      "policyType": 0,
+      "operation": 2,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
+    },
+    {
+      "schemaName": "StorefrontHero",
+      "policyName": "admin role can delete storefront hero content",
+      "policyDescription": "Only back-office administrators may delete storefront hero content.",
+      "policyType": 0,
+      "operation": 3,
+      "ruleGroup": {
+        "logicalOperator": 0,
+        "rules": [
+          {
+            "leftSource": 0,
+            "leftOperand": "roles",
+            "operator": 6,
+            "rightSource": 2,
+            "rightOperand": "",
+            "staticValue": "admin",
+            "description": null
+          }
+        ],
+        "nestedGroups": []
+      },
+      "priority": 1,
+      "isAllowPolicy": true
     }
   ],
-  "security": []
+  "security": [
+    { "schemaId": "ce715cf1-28a9-410e-8fba-bb177928d036", "accessLevel": 2, "fieldNames": [], "operation": 0, "policyType": 0 },
+    { "schemaId": "ce715cf1-28a9-410e-8fba-bb177928d036", "accessLevel": 3, "fieldNames": [], "operation": 1, "policyType": 0 },
+    { "schemaId": "ce715cf1-28a9-410e-8fba-bb177928d036", "accessLevel": 3, "fieldNames": [], "operation": 2, "policyType": 0 },
+    { "schemaId": "ce715cf1-28a9-410e-8fba-bb177928d036", "accessLevel": 3, "fieldNames": [], "operation": 3, "policyType": 0 }
+  ]
 }
