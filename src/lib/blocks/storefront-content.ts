@@ -38,7 +38,7 @@ export const DEFAULT_STOREFRONT_HERO: StorefrontHeroContent = {
   SecondaryCtaHref: "/products",
   ImageUrl: "",
   ImageFileId: "",
-  ImageAltText: "A considered collection of modern furniture and objects",
+  ImageAltText: "A warm contemporary living room with sculptural furniture and natural textures",
   HighlightOne: "Curated collections",
   HighlightTwo: "Secure account",
   HighlightThree: "Thoughtful delivery",
