@@ -3,7 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { ChevronLeft, X } from "lucide-react";
 import clsx from "clsx";
 import { CartioAnimatedLogo } from "@/components/brand/cartio-animated-logo";
-import { ADMIN_NAV_ITEMS, DASHBOARD_NAV_ITEM } from "./nav-items";
+import { ADMIN_NAV_ITEMS, DASHBOARD_NAV_ITEM, STOREFRONT_CONTENT_NAV_ITEM } from "./nav-items";
 
 const COLLAPSE_KEY = "admin-sidebar-collapsed";
 
@@ -81,6 +81,10 @@ export function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           <NavLink to="/admin" end className={linkClass} title="Dashboard">
             <DASHBOARD_NAV_ITEM.icon size={19} className="flex-none" />
             {!collapsed && "Dashboard"}
+          </NavLink>
+          <NavLink to="/admin/storefront-content" className={linkClass} title={STOREFRONT_CONTENT_NAV_ITEM.label}>
+            <STOREFRONT_CONTENT_NAV_ITEM.icon size={19} className="flex-none" />
+            {!collapsed && <span className="truncate">{STOREFRONT_CONTENT_NAV_ITEM.label}</span>}
           </NavLink>
         </NavSection>
 

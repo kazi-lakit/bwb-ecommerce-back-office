@@ -10,6 +10,7 @@ import {
   Layers,
   LayoutDashboard,
   Package,
+  PanelsTopLeft,
   ShoppingBag,
   Tag,
   Truck,
@@ -62,8 +63,16 @@ export interface NavItem {
  * screen is reachable now; fold it into the generated list once the schema is live and
  * `schema-meta.ts` has been regenerated.
  */
+export const STOREFRONT_CONTENT_NAV_ITEM: NavItem = {
+  schemaName: "StorefrontHero",
+  slug: "storefront-content",
+  label: "Storefront content",
+  icon: PanelsTopLeft,
+};
+
 const COMMERCE_NAV_ITEMS: NavItem[] = [
   { schemaName: "Order", slug: "orders", label: "Orders", icon: ShoppingBag },
+  STOREFRONT_CONTENT_NAV_ITEM,
 ];
 
 export const ADMIN_NAV_ITEMS: NavItem[] = [

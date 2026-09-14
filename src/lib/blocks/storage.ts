@@ -46,7 +46,7 @@ interface FileGetResponse {
   isSuccess?: boolean;
 }
 
-export async function uploadProductImage(file: File): Promise<UploadedImage> {
+export async function uploadPublicImage(file: File): Promise<UploadedImage> {
   assertValidImage(file);
 
   const presign = (await blocksDataCall(() =>
@@ -75,3 +75,7 @@ export async function uploadProductImage(file: File): Promise<UploadedImage> {
 
   return { fileId, url: fileRecord.url };
 }
+
+// Existing product forms keep their domain-specific name; storefront content uses the
+// same public-image upload path because both assets must render for signed-out visitors.
+export const uploadProductImage = uploadPublicImage;

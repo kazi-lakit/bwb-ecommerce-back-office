@@ -155,6 +155,7 @@ export default function DashboardPage() {
               <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">Quick access</h3>
               <div className="mt-3 space-y-1">
                 {[
+                  { label: "Edit storefront hero", to: "/admin/storefront-content" },
                   { label: "Review products", to: "/admin/product" },
                   { label: "Manage purchase orders", to: "/admin/purchase-order" },
                   { label: "Open supplier directory", to: "/admin/supplier" },
